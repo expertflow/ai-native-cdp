@@ -2,8 +2,8 @@
 
 > **Status:** Active — Working Backlog (Round 2 — updated June 2026)
 > **Produced by:** Problem Inventory analysis + stakeholder corrections (June 2026)
-> **Sources:** `problem-inventory-cicd-test-automation.md`, `docs/cicd_objectives_gaps.md`, Confluence retro pages, direct stakeholder input (Haroon — RMT, Junaid — RMT)
-> **Last updated:** 2026-06-03
+> **Sources:** `problem-inventory-cicd-test-automation.md`, `docs/cicd_objectives_gaps.md`, `team_input/Road to CD.md`, Confluence retro pages, direct stakeholder input (Haroon — RMT, Junaid — RMT)
+> **Last updated:** 2026-06-04
 
 ---
 
@@ -95,8 +95,50 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 - When RMT cuts a new incremental RC build, an automated notification fires to all stream teams (Slack + Jira comment or Confluence page update)
 - The current RC build version is always visible in one canonical place, updated by CI automatically
 
+**Phase 1 — Notification (current scope):**
+Notification fires automatically when a new incremental RC build is deployed. Stream teams are informed and can manually update their environments.
+
 **DRI:** Haroon / RMT  
 **Effort:** Low — CI step + Slack webhook
+
+**Phase 2 — Auto-update stream environments (follow-on after T1-5):**
+Once the CD pipeline (T1-5 / CRM-763) is stable, stream-aligned team environments are automatically updated with the latest RC build following the notification — no manual action required from stream teams.
+
+**DRI (Phase 2):** Haroon  
+**Effort:** Low–Medium — depends on T1-5 CD pipeline being in place first; primarily configuration + pipeline extension
+
+---
+
+### T1-5 · GitLab CD Pipeline Not Set Up
+**Jira:** [CRM-763 — Setup GitLab CD (Continuous Deployment) pipeline](https://expertflow-docs.atlassian.net/browse/CRM-763) · Assigned: Umar Naveed · Status: In Progress (running in parallel)
+
+**Problem:** RMT currently uses GitLab CI to build and push container images, but deployment to the on-prem Kubernetes cluster is done manually. Every deployment requires a person to execute it, introducing delays and human error. There is no CD stage in the pipeline. CXVOICE and CXBI (reports, reporting server, data pipelines) are also not properly covered under CI/CD and remain a separate gap.
+
+**Why it's Tier 1:** This is the foundational piece that unlocks the delivery improvement programme. Without automated CD, the entire incremental RC build cycle stays manual and error-prone. It runs in parallel with other Tier 1 items rather than blocking them.
+
+**Decided approach:** Native GitLab agent (not ArgoCD or push-based deployment).
+
+**Target workflow (scope of CRM-763):**
+1. Stream-aligned team develops and tests a feature on their own team server
+2. On merge to the release branch, the CD script automatically upgrades RMT's incremental build with that update — no manual deployment request
+
+**Out of scope for CRM-763 — follow-on item (DRI: Haroon):**
+Once CRM-763 is complete, the next step is: stream-aligned team environments are automatically updated with the latest RC build following a notification. This will be tracked separately.
+
+**What good looks like:**
+- GitLab CI pipeline extended with a CD stage using the native GitLab agent that deploys to the on-prem K8s cluster via Helm automatically
+- Merge to release branch is the trigger — no manual deployment request required
+- No manual deployment steps required; a stream team's release-ready feature triggers the RMT incremental build upgrade end-to-end
+
+**Known gap — rollback not defined:** There is currently no rollback process for an incremental RC build upgrade that fails or causes regression. This is the next item to address once the CD pipeline is stable (candidate for T1-3 scope or a new item).
+
+**Next actions:**
+- Complete POC and document the native GitLab agent deployment model
+- Align with T1-4 so the notification fires automatically from the CD pipeline post-deployment
+- Define rollback procedure for failed incremental upgrades
+
+**DRI:** Umar Naveed  
+**Effort:** Medium — POC in progress; full workflow implementation follows
 
 ---
 
@@ -106,7 +148,7 @@ These have significant compounding cost if delayed but are not immediately block
 
 ---
 
-### T2-1 · IaC Gaps: CXVOICE, CXCHAN Not Enabled, CXBI Excluded
+### T2-1 · IaC and CD Gaps: CXVOICE, CXCHAN Not Enabled, CXBI Excluded
 **Cluster:** E1, E2, E3, G5
 
 **Problem:** CXVOICE has no IaC — every environment is a manual snowflake. CXCHAN is not enabled on the IaC and code review process. CXBI/WFM are excluded from IaC and release planning entirely. Several engineers (Bilal Alam, Ehtasham, WFM/BI team) are not trained on IaC deployment.
@@ -116,7 +158,13 @@ These have significant compounding cost if delayed but are not immediately block
 **Phased approach:**
 1. CXCHAN enablement (lower effort — code review process already exists for other teams)
 2. CXBI/WFM onboarding to release planning and IaC
-3. CXVOICE IaC design and implementation (longest lead time)
+3. CXVOICE IaC and CD — full treatment required (see sub-items below)
+
+**CXVOICE sub-items (to be addressed as part of phase 3):**
+- Structural definition of CXVOICE components and how they are deployed (which services, which Helm charts, which namespaces)
+- Release management mechanism per CXVOICE component (versioning, tagging, upgrade path)
+- Configuration management — environment-specific configs, secrets, and ConfigMaps for voice components
+- Automated testing for CXVOICE in the CD pipeline (smoke tests at minimum post-deploy)
 
 **DRI suggestion:** Haroon (IaC) + respective stream tech leads  
 **Effort:** Medium–High depending on component
@@ -216,11 +264,58 @@ These have significant compounding cost if delayed but are not immediately block
 
 ---
 
+### T2-8 · CX Decomposition into Smaller Independently Releasable Packages
+**Cluster:** G1, G2 (was T4-1 — elevated)
+
+**Problem:** CX ships as a monolithic bundle. Stream-aligned teams cannot independently deploy, validate, or release their own services — every change must pass through the full monolithic integration cycle, inflating lead time, blast radius, and risk. CXAGENT, CXCHAN, CXVOICE, CXBI, and CXPLAT are logical package boundaries but currently ship together. The primary known blocker is the **Object Model (OM)** dependency, which requires manual updates across all components and prevents independent versioning.
+
+**Why it's Tier 2 (elevated from T4):** This is the strategic capability that gives stream teams genuine release autonomy — shorter feedback loops, targeted testing per package, and reduced upgrade risk for customers. OM version management has been elevated to Tier 1 (see T1-2 / CRM-706 scope); once OM is automated, decomposition becomes actionable.
+
+**Prerequisite:** OM versioning automation must be resolved first (part of T1-2 scope). Decomposition design can begin in parallel.
+
+**What good looks like:**
+
+- Natural package boundaries are defined and agreed (CXAGENT, CXCHAN, CXVOICE, CXBI, CXPLAT as candidates)
+- The skeleton project supports selective component versioning
+- At least one package (lowest OM coupling) can be released independently with its own CI/CD pipeline
+- Hard interdependencies are documented; a roadmap exists to eliminate or automate each one
+
+**Questions to resolve:**
+
+- Which component has the lowest OM coupling and is the best first candidate for independent release?
+- What is the minimum change to the skeleton project to support selective component versioning?
+- Which components have hard interdependencies beyond OM that prevent independent release?
+
+**DRI:** Jawad + Haroon + stream leads  
+**Effort:** High — design-first (Q3), phased implementation per package
+
+---
+
+### T2-9 · Reporting and Data Platform (Metabase + Airflow) Not Packaged or Released
+**Cluster:** G5 (elevated from T4-6)
+
+**Problem:** Metabase (reporting) and Airflow (data pipelines) have no defined packaging, release, or deployment process. There is no IaC, no CD pipeline, and no release management mechanism for these components. Every deployment is ad-hoc. These are not currently covered under CI/CD at all.
+
+**Why elevated to Tier 2:** Raised as an active concern in the June 1 2026 meeting. These components are customer-facing and business-critical — the absence of a release process creates unpredictable delivery and support risk. Waiting on T2-1 (CXBI onboarding) is no longer sufficient justification to defer.
+
+**What good looks like:**
+- Metabase and Airflow are packaged as versioned, deployable artifacts (Helm charts or equivalent)
+- A defined release management mechanism exists per component (versioning, tagging, upgrade path)
+- Data pipelines (Airflow DAGs) are version-controlled and deployed via CD, not manually
+- Components are included in IaC and release planning alongside the rest of the CX stack
+
+**First step:** Assign an owner to define packaging scope and answer: are these shipped as part of CX releases, or independently? That decision shapes everything else.
+
+**DRI suggestion:** BI/WFM team lead + Haroon  
+**Effort:** Medium — design and scoping first, then implementation
+
+---
+
 ## 🟡 Tier 3 — Plan This Quarter (Meaningful ROI, Not Immediately Blocking)
 
 | # | Challenge | Why Tier 3 | DRI |
 |---|-----------|------------|-----|
-| T3-1 | Regression coverage lift from 70% to 85%+ | 70% is good progress; next increment needs Playwright framework stable first | QA team |
+| T3-1 | Regression coverage lift from 70% to 85%+ | 70% milestone demonstrated June 4 2026 (Playwright — Umar Ikhlaq). Next: define objectives and milestones for path to 85%+ | Umar Ikhlaq (Head of QA) |
 | T3-2 | Feature flag framework production-ready | Enables TBD and safe merging of incomplete work; needs TBD adoption enforced first | Awais / DevOps |
 | T3-3 | Release versioning policy enforcement | Process discipline before tooling; quick governance fix | Haroon + stream leads |
 | T3-4 | IaC for pre-release versions (stream self-serve) | Reduces dependency on RMT for env setup; high cognitive load reduction | RMT |
@@ -229,7 +324,7 @@ These have significant compounding cost if delayed but are not immediately block
 | T3-7 | Trunk-Based Development adoption verified across all teams | TBD doc exists; actual adherence across non-Core teams is unclear | Awais + stream leads |
 | T3-8 | Teams outside Core brought to same dev/code-review standards | Integration surprises traced to non-Core teams not following same practices | Haroon + stream leads |
 | T3-9 | Formal rollback procedure documented | Currently ad-hoc via Google Chat; tribal knowledge | RMT |
-| T3-10 | Dual-codebase patch process formalized | Reactive, unplanned cost today; needs a trigger protocol and effort accounting | Jawad + POs |
+| T3-10 | Hotfix and dual-codebase patch process formalized | Two related gaps: (1) hotfix must be release-ready for the latest production release; (2) stream-aligned teams are not consistently applying hotfix changes back to the latest develop branch — a gate is needed to enforce this. Reactive and unplanned today; needs a trigger protocol, gate, and effort accounting | Jawad + Haroon + POs |
 
 ---
 
@@ -239,12 +334,10 @@ These are real and worth tracking, but they depend on Tier 1–2 progress or req
 
 | # | Challenge | Dependency / Blocker |
 |---|-----------|----------------------|
-| T4-1 | CX decomposition into smaller releasable packages | Blocked by Object Model dependency resolution; needs Tier 1 quality stability first |
 | T4-2 | WCAG accessibility compliance (Customer Widget + Agent Desk) | Customer ask growing; no owner or target level defined yet |
 | T4-3 | Continuous Deployment — business feedback loop | Requires a "friendly customer" programme and feedback mechanism design |
 | T4-4 | Customer-facing support lifecycle policy | FNB/Andreas request; needs product and management alignment |
 | T4-5 | Cisco deployment ownership and reliability | Low frequency; needs an owner assigned, then a process |
-| T4-6 | Reporting/data platform (Metabase + Airflow) packaging | Undefined scope; requires BI team to be onboarded first (T2-1) |
 
 ---
 
@@ -252,10 +345,10 @@ These are real and worth tracking, but they depend on Tier 1–2 progress or req
 
 | Tier | Count | Defining characteristic |
 |------|-------|------------------------|
-| 🔴 Tier 1 | 4 | Root causes and active risks; fix first |
-| 🟠 Tier 2 | 7 | High compounding cost; next 1–2 quarters |
+| 🔴 Tier 1 | 5 | Root causes and active risks; fix first |
+| 🟠 Tier 2 | 9 | High compounding cost; next 1–2 quarters |
 | 🟡 Tier 3 | 10 | Real value; plan this quarter, sequence carefully |
-| ⚪ Tier 4 | 6 | Strategic horizon; track but don't act yet |
+| ⚪ Tier 4 | 4 | Strategic horizon; track but don't act yet |
 
 ---
 

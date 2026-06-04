@@ -104,11 +104,13 @@ Without a defined load test environment, performance baselines cannot be establi
 **What Confluence says:**  
 Action item for Masood Farooq Malik: implement **multi-step upgrade through Helm pre/post hooks** — currently open.
 
+**Jira Epic:** [CRM-706 — Multi-version Upgrade](https://expertflow-docs.atlassian.net/browse/CRM-706) · Assigned: Haroon Ahmed · Status: Open
+
 **Why it matters:**  
 Customers upgrading from CX5.0 to CX5.2 (skipping a minor) need intermediate migration steps (schema changes, config transformations) executed automatically. Without Helm hooks orchestrating this, upgrade failures and manual intervention are inevitable.
 
 **What's missing from project docs:**  
-The master pipeline documents the upgrade/downgrade goal at a high level (Helm-based automation) but does not address multi-version upgrade paths or how Helm lifecycle hooks are used to execute intermediate steps.
+The master pipeline documents the upgrade/downgrade goal at a high level (Helm-based automation) but does not address multi-version upgrade paths or how Helm lifecycle hooks are used to execute intermediate steps. The work is scoped in CRM-706 (ConfigMaps externalization, DB schema migrations across MongoDB/PostgreSQL/Reporting, env var management, secrets rotation, tenant-specific versioned configs in S3/DB); execution is the gap.
 
 **Questions to resolve:**
 - Which release-to-release transitions require intermediate steps? (Database schema migrations are the primary driver)
@@ -120,28 +122,20 @@ The master pipeline documents the upgrade/downgrade goal at a high level (Helm-b
 
 ## Gap 6 — SonarQube Coverage Targets: Developer vs Community
 
+> **Status: Deliberate design choice — not a gap to resolve.**  
+> The two-instance setup (Developer at 90%, Community at 80%) is intentional. No action required here.
+
 **What Confluence says:**  
 Expertflow runs two SonarQube instances with different coverage targets:
 - **SonarQube Developer:** 90% coverage on new code
 - **SonarQube Community:** 80% coverage on new code
 
-Action items (SonarQube Code Coverage Plan page):
-- Implement quality gates per defined criteria
-- Generate SonarQube scan report for overall codebase (both editions)
-- Plan identified technical debt with relevant team (create Epics)
-
-**What's missing from project docs:**  
-The master pipeline references SonarQube as a gate (no new critical/blocker issues) but does not document the two-instance setup, the different coverage thresholds per edition, or the technical debt remediation planning process.
-
-**Questions to resolve:**
-- Which teams/projects are on Developer edition vs Community edition? Is there a migration plan?
-- Are the quality gate definitions finalized for both instances? (Confluence links to a separate quality gates page — needs review)
-- What is the current baseline coverage across the codebase? (This scan was an action item for Nabeel/Haroon — what was the result?)
-- How does technical debt get planned — as dedicated Epics per team, or as a shared backlog?
-
 ---
 
 ## Gap 7 — Continuous Delivery vs Continuous Deployment: Strategic Distinction
+
+> **Status: Acknowledged — deferred to Tier 4 (T4-3) in the priority list.**  
+> The distinction is understood but the CD practice (friendly customer programme, feedback mechanism, CE loop) has not been designed yet. Tracked as T4-3 in `priority-list-cicd-test-automation.md`.
 
 **What Confluence says:**  
 These are two distinct practices with different orientations:
@@ -158,7 +152,7 @@ Continuous Deployment at Expertflow means getting releasable software in front o
 **What's missing from project docs:**  
 The master pipeline defines the technical pipeline (Continuous Delivery) thoroughly but does not define the **Continuous Deployment** practice — who the "friendly customers" are, how business feedback is collected, what the feedback loop looks like, and how it feeds back into requirements.
 
-**Questions to resolve:**
+**Questions to resolve (when T4-3 is activated):**
 - Which internal business team can act as the first-recipient of new releases for business validation?
 - Do we have a "friendly customer" programme? If not, how do we establish one?
 - What is the feedback mechanism — structured interview, usage analytics, support tickets, dedicated session?
@@ -168,20 +162,22 @@ The master pipeline defines the technical pipeline (Continuous Delivery) thoroug
 
 ## Gap 8 — Breaking CX into Smaller Releasable Packages
 
+> **Priority elevated to Tier 2** — this is the strategic capability that gives each stream team the ability to release their service independently, reducing lead time and blast radius. The primary blocker (Object Model version management) has been elevated to Tier 1 in the priority list. Tracked as **T2-8** in `priority-list-cicd-test-automation.md`.
+
 **What Confluence says:**  
 A recurring action item: go through the SAFe **Release on Demand** framework to discuss decomposing CX into smaller, independently releasable packages. Two Google Docs and one Confluence page exist on this topic (not yet reviewed here).
 
 **Why it matters:**  
-The current CX release is a monolithic bundle. Smaller packages mean faster delivery of specific capabilities to customers, reduced upgrade risk, and more targeted testing.
+Teams cannot independently deploy, validate, or release their own services today. Every change — regardless of scope — must pass through the full monolithic integration cycle, inflating lead time and risk. Decomposing CX gives stream teams genuine release autonomy and allows targeted testing per package.
 
 **What's missing from project docs:**  
 The master pipeline references Release on Demand in Phase 5 (RoD) but has no strategy for how CX would be decomposed — what the candidate packages are, which teams own them, and what the release cadence per package would be.
 
 **Questions to resolve:**
 - What are the natural package boundaries? (CXAGENT, CXCHAN, CXVOICE, CXBI, CXPLAT are logical candidates but they currently ship together)
-- Which components have hard interdependencies that prevent independent release? (Object Model/OM is one known blocker — documented in Road to CD)
+- Which components have hard interdependencies that prevent independent release? (Object Model/OM is the primary known blocker — documented in Road to CD)
 - What is the minimum change to the skeleton project to support selective component versioning?
-- Is this a Q3/Q4 initiative or longer-horizon? (Depends on OM dependency resolution)
+- Once OM versioning is automated (T1 prerequisite), which package is the first candidate for independent release?
 
 ---
 
@@ -189,11 +185,11 @@ The master pipeline references Release on Demand in Phase 5 (RoD) but has no str
 
 | Gap | Urgency | Who Should Drive | Current Status |
 |-----|---------|-----------------|----------------|
-| WCAG Compliance | Medium (customer ask) | QA Lead + Dev Leads | Not started |
-| Vulnerability mgmt all releases | High (customer trust) | RMT + Abdul Moeed | Action item open |
-| Automated dependency updates | Medium | DevOps / RMT | Not started |
-| Load test environment | Medium | RMT + QA | Scoping only |
-| Multi-step Helm upgrade hooks | High (upgrade reliability) | Masood / RMT | Action item open |
-| SonarQube Dev vs Community targets | Medium | Haroon + Nabeel | Scans pending |
-| CD vs CI strategic distinction | Low (clarity/framing) | Jawad | Not documented |
-| Smaller CX packages (OM dependency) | Low-Medium (strategic) | Jawad + Haroon + stream leads | Discussed only |
+| WCAG Compliance | Medium (customer ask) | QA Lead + Dev Leads | Not started (T4-2) |
+| Vulnerability mgmt all releases | High (customer trust) | RMT + Abdul Moeed | Action item open (T2-4) |
+| Automated dependency updates | Medium | DevOps / RMT | Not started (T2-7) |
+| Load test environment | Medium | RMT + QA | Infra exists; wiring + thresholds pending (T2-6) |
+| Multi-step Helm upgrade hooks | High (upgrade reliability) | Haroon Ahmed | In progress — CRM-706 open (T1-2) |
+| SonarQube Dev vs Community targets | N/A | N/A | Deliberate design choice — not a gap |
+| CD vs CI strategic distinction | Low (clarity/framing) | Jawad | Acknowledged — deferred (T4-3) |
+| Smaller CX packages (OM dependency) | High (stream autonomy) | Jawad + Haroon + stream leads | Elevated to T2-8; OM unblocking is T1 |
