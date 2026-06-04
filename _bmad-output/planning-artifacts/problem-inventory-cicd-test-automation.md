@@ -1,7 +1,8 @@
 # Problem Inventory: CI/CD, Test Automation & Delivery Process
 
-> **Status:** Complete — Shared Understanding Phase  
-> **Sources:** `docs/How_We_Work.md`, `team_input/Road to CD.md`, `team_input/QA Automation (BDD + Playwright)..md`, `docs/cicd_objectives_gaps.md`, direct stakeholder input  
+> **Status:** Updated — Round 2 (June 2026)
+> **Sources:** `docs/How_We_Work.md`, `team_input/Road to CD.md`, `team_input/QA Automation (BDD + Playwright)..md`, `docs/cicd_objectives_gaps.md`, direct stakeholder input (Haroon — RMT, Junaid — RMT)
+> **Last updated:** 2026-06-03
 > **Goal:** Complete inventory before moving to solution design
 
 ---
@@ -141,11 +142,11 @@
 
 ## 5. Infrastructure & Environment
 
-### 5.1 No IaC for Voice (CXVOICE)
-- **Problem:** CXVOICE environments must be set up manually. No Infrastructure-as-Code scripts exist.
-- **Impact:** Environment creation is high-effort, slow, and non-reproducible. Voice components cannot be reliably deployed or tested in CI/CD.
-- **Evidence:** How We Work §2.1: *"IaC NOT available. Environment must be set up manually."* — Status: Manual — high effort
-- **Source:** `docs/How_We_Work.md`
+### 5.1 No IaC for Voice (CXVOICE) — Auto-Deployment Is a Pain Point on Every Development Cycle
+- **Problem:** CXVOICE environments must be set up manually. No Infrastructure-as-Code exists for voice component deployment or configuration. This is not just a future gap — Haroon (RMT) has flagged auto-deployment and configuration of voice infrastructure as a **recurring pain point on every development cycle**.
+- **Impact:** Every time a developer needs a voice environment — for feature testing, integration validation, or RMT — it requires manual effort from a small number of people. Environment setup is slow, non-reproducible, and blocks parallelisation. Voice components cannot be included in automated CI/CD pipelines.
+- **Evidence:** How We Work §2.1: *"IaC NOT available. Environment must be set up manually."* — Status: Manual — high effort. Road to CD June 1: "Voice is not part of the `cim-solution` skeleton — structural definition, release management, and automated testing are undefined." Direct input: Haroon (RMT) — June 2026.
+- **Source:** `docs/How_We_Work.md`, `team_input/Road to CD.md`, direct stakeholder input (Haroon)
 
 ### 5.2 BI/WFM Servers Not in IaC Pool
 - **Problem:** CXBI/WFM servers are not managed by IaC. This team is also excluded from release planning.
@@ -159,7 +160,13 @@
 - **Evidence:** How We Work §2.1 and §8
 - **Source:** `docs/How_We_Work.md`
 
-### 5.4 GitLab Runner Performance Under Load
+### 5.4 Vault Unseal Is Manual — Active Daily Blocker for Lab Environments
+- **Problem:** HashiCorp Vault becomes sealed on every restart due to its secure-by-design model. Expertflow's lab environment VMs are shut down at the end of each working day and restarted each morning. Every restart requires a manual unseal operation using Shamir keys, plus re-initialisation of Kubernetes authentication. This operation must be performed by Junaid or specific stream-aligned team members. At times, the unseal process does not complete successfully, leaving some services inoperable until the issue is diagnosed and resolved.
+- **Impact:** Every working morning begins with a manual unblocking step. If the person holding the keys is unavailable, or if the unseal fails silently, stream-aligned teams cannot work. This is not a theoretical risk — it is a documented daily friction point. Kubernetes auth token rotation after restarts compounds the problem by breaking service access to secrets even after unseal succeeds.
+- **Evidence:** Jira [CIM-33146](https://expertflow-docs.atlassian.net/browse/CIM-33146) — "Automate Vault Unseal and Token Recovery for EF CX (Cloud-Agnostic Implementation)" — Status: **In Progress**, Assigned: Zaryab Baloch + Nasir Khursheed. Direct stakeholder input: Junaid (RMT) — June 2026. Solution design is complete and documented in the Jira ticket (three-component approach: Bootstrap Vault transit KMS + Transit Auto-Unseal config + Post-Unseal K8s Auth Reinit CronJob).
+- **Source:** Direct stakeholder input (Junaid), Jira CIM-33146
+
+### 5.5 GitLab Runner Performance Under Load
 - **Problem:** GitLab runners slow down significantly when multiple pipelines run concurrently.
 - **Impact:** CI feedback loops become longer. Developers wait for pipeline results, reducing productivity.
 - **Evidence:** Direct stakeholder input
@@ -261,11 +268,11 @@
 - **Evidence:** Road to CD June 1 meeting points: *"Need to either remove the OM dependency or automate the process"*
 - **Source:** `team_input/Road to CD.md`
 
-### 8.3 Reporting & Data Platform Packaging Undefined
-- **Problem:** Metabase and Airflow (reporting and data platform) do not have a defined packaging and release mechanism.
-- **Impact:** These components cannot be reliably included in automated releases.
-- **Evidence:** Road to CD June 1 meeting points
-- **Source:** `team_input/Road to CD.md`
+### 8.3 Reporting & Data Platform Auto-Deployment Is Undefined and Painful
+- **Problem:** Metabase and Airflow (reporting and data platform) do not have a defined packaging and release mechanism. There is no IaC or automation for deploying or configuring reporting infrastructure. Haroon (RMT) has flagged this as a **recurring pain point for every development cycle**, not just a packaging gap for future releases.
+- **Impact:** Every deployment of reporting components requires manual intervention. Teams cannot self-serve a reporting environment. This slows down feature work that touches reporting and prevents automated testing of reporting components.
+- **Evidence:** Road to CD June 1 meeting points: *"Need to define how Metabase + Airflow should be packaged and released."* Direct input: Haroon (RMT) — June 2026.
+- **Source:** `team_input/Road to CD.md`, direct stakeholder input (Haroon)
 
 ### 8.4 Feature Flag Framework Is Not Finalized
 - **Problem:** A feature flag framework is needed but not yet in production.

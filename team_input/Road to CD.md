@@ -5,7 +5,7 @@ Source: https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/2024210454/Ro
 ## Core Problems
 
 1. **Waiting in queue** — Team B can't start until Team A is done on RMT. Work is piling up instead of flowing.
-2. **Everything on RMT is manual** — Building, deploying, testing all done manually. Every step needs someone to do it manually, which is slow and depends on specific people being available.
+2. **Everything on RMT is manual** — Building, deploying, testing all done manually. Every step needs someone to do it manually, which is slow and depends on specific people being available. (RMT/QA)
 3. **RMT changes don't reach teams automatically** — When something changes, nobody gets notified or updated automatically; teams can easily miss it or fall behind. A proper mechanism for announcing RMT changes systematically is needed.
 
 ## Open Action Items
@@ -32,9 +32,12 @@ Source: https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/2024210454/Ro
 - **VAPT process** on released and to-be-released:
   - Announce the policy
   - Automate the scanning and fixing — security hotfix
+  - Related: [VAPT page 1](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/1238893777), [VAPT page 2](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/1941504045), [VAPT page 3](https://expertflow-docs.atlassian.net/wiki/x/AwD8cw), [VAPT page 4](https://expertflow-docs.atlassian.net/wiki/spaces/~55705835b89813bf8740fc84ac066dff1360ed/pages/1340506148)
 - **Feature flag framework** finalization
 
 ## Related Documents
 
 - [Release retro](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/505511940)
+- [Release retro 2](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/1945501729)
+- [EF Internal page](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/2000252)
 - [Sessions with Awais on improving CI/CD](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/1636827164)
