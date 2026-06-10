@@ -38,13 +38,13 @@ The overall tier assignments in the priority list are still not fully aligned wi
 
 | Item | Current list placement | EF's signal | Question to resolve |
 |------|----------------------|-------------|---------------------|
-| T1-1 DoD enforcement | Tier 1 | No explicit disagreement yet | Is this still the root cause everyone agrees on? |
+| T1-1 DoD enforcement | Tier 1 | Active — start this week | Haroon + stream tech leads; process design + CI gate implementation |
 | T1-2 Multi-path upgrade (Helm hooks) | Tier 1 | No explicit disagreement yet | Is Masood's action item moving? |
-| T1-3 Data rollback | Tier 1 | No explicit disagreement yet | Nabeel bandwidth — OM first, then this? |
-| T1-4 Pre-release version announcement | Tier 1 (low effort) | No explicit disagreement yet | Quickest win — is this assigned? |
-| T2-3 Integration testing guide | Tier 2 | No progress (Nabeel) | Still Tier 2 or deprioritised given OM work? |
+| T1-3 Data rollback | Tier 1 | No explicit disagreement yet | Sequenced last in Nabeel's stack — after OM (T1-6), Reporting (T2-9), and Integration Guide (T2-3) |
+| T1-4 RC build advance notification | Tier 1 (low effort) | Active — start this week | Haroon / RMT; CI step + Slack webhook; lowest effort, highest frequency win |
+| T2-3 Integration testing guide | Tier 2 | No progress (Nabeel) | Sequenced 3rd in Nabeel's stack — after OM (T1-6) and Reporting (T2-9) |
 | T2-5 Release target changes mid-dev | Tier 2 | No explicit disagreement yet | Governance call — who owns this? |
-| Nabeel bandwidth | — | Concern raised | OM (T1-6) + Data rollback (T1-3) + Reporting (T2-0) is too much for one person in same window |
+| Nabeel bandwidth | — | Resolved — sequenced | OM (T1-6) → Reporting (T2-9) → Integration Guide (T2-3) → Data Rollback (T1-3) |
 
 ---
 
@@ -56,6 +56,36 @@ The overall tier assignments in the priority list are still not fully aligned wi
 4. **Confirm Saud's scope** for voice automation
 5. **Answer the open question** on reporting/data platform pain (initial deploy vs upgrade regression)
 6. **Agree on a 3-week plan** with named owners and dated milestones
+
+---
+
+## This Week's Plan (Week of June 8, 2026)
+
+Only these items are in scope for this week. Everything else is queued.
+
+### Active This Week
+
+| Item | Owner | Target |
+|------|-------|--------|
+| **T1-1 Release-Ready DoD Enforcement** | Haroon + stream tech leads | Draft DoD criteria; identify first CI gate |
+| **T1-4 RC Build Advance Notification** | Haroon / RMT | Wire Slack webhook to RC build completion |
+| **T1-5 GitLab CD Pipeline POC** | Umar Naveed (CRM-763) | Demo + document native GitLab agent model |
+| **T1-6 Object Model Version Management** | Nabeel + Ahsan | **Finish this week** (~1 week remaining) |
+| **Voice Deployment Automation** | Saud (parallel track) | Audit manual steps; separate config from scriptable |
+
+### Starting After T1-6 Completes (Same Week If Possible)
+
+| Item | Owner | Trigger |
+|------|-------|---------|
+| **T2-9 Reporting/Data Platform Packaging** | Nabeel | Starts immediately after OM (T1-6) is done |
+
+### Explicitly NOT This Week
+
+| Item | Owner | Why |
+|------|-------|-----|
+| **T1-2 Multi-Path Upgrade (Helm hooks)** | Haroon (CRM-706) | High effort; check Masood's progress only — do not start new work |
+| **T1-3 Data Rollback Mechanism** | Nabeel | Sequenced last in Nabeel's stack; starts after Integration Guide (T2-3) |
+| **T2-3 Integration Testing Guide** | Nabeel | Sequenced 3rd; starts after Reporting (T2-9) |
 
 ---
 

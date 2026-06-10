@@ -41,6 +41,8 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 **DRI suggestion:** Haroon + stream tech leads  
 **Effort:** Medium — process design + CI gate implementation
 
+**Start week:** June 8, 2026 — target: draft DoD criteria and identify first CI gate to enforce
+
 ---
 
 ### T1-2 · Multi-Path Upgrade Not Supported
@@ -78,6 +80,8 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 **DRI suggestion:** Nabeel + stream DB owners  
 **Effort:** High — design-first, then incremental implementation per service
 
+**Sequencing note:** Nabeel's 4th and final priority in current stack — after OM version management (T1-6), Reporting/Data Platform packaging (T2-9), and Integration Testing guide (T2-3).
+
 ---
 
 ### T1-4 · No Automated Notification When the Incremental RC Build Advances
@@ -100,6 +104,8 @@ Notification fires automatically when a new incremental RC build is deployed. St
 
 **DRI:** Haroon / RMT  
 **Effort:** Low — CI step + Slack webhook
+
+**Start week:** June 8, 2026 — target: Slack webhook wired to RC build completion event
 
 **Phase 2 — Auto-update stream environments (follow-on after T1-5):**
 Once the CD pipeline (T1-5 / CRM-763) is stable, stream-aligned team environments are automatically updated with the latest RC build following the notification — no manual action required from stream teams.
@@ -196,6 +202,8 @@ These have significant compounding cost if delayed but are not immediately block
 **Why it's Tier 2 (not Tier 1):** The 70% regression automation already catches some of what integration tests would catch at the later stage. However, the retro evidence is clear that the class of defects escaping to RMT — Keycloak permission mismatches, async behavior issues, cross-component interference — is exactly what integration tests are designed to prevent.
 
 **Recommended first step:** Nabeel produces the integration testing guide. This is a scoping exercise (which service boundaries are highest risk? what tooling fits — Testcontainers, Pact, Supertest?) before any implementation commitment.
+
+**Sequencing note:** Nabeel's 3rd priority after OM version management (T1-6) and Reporting/Data Platform packaging (T2-9).
 
 **DRI suggestion:** Nabeel Ahmad  
 **Effort:** Low to start (guide) — Medium to implement
