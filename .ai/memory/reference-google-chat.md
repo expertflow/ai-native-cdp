@@ -3,7 +3,9 @@
 
 ## Google Chat Space — AI-Native CDP Project
 
-**Space URL:** https://chat.google.com/room/AAAAyffa-Sk
+**Space URL:** https://chat.google.com/room/AAAAyffa-Sk  
+**Space ID (API):** `spaces/AAAAyffa-Sk`  
+**Display name confirmed:** "AI-Driven QA, CI/CD"
 
 This is the primary communication channel for the AI-Native CDP project. The team discusses and reviews progress, shares updates, and coordinates here.
 
