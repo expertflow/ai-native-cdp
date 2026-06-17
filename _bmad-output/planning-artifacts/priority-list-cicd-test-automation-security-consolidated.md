@@ -307,12 +307,13 @@ These have significant compounding cost if delayed but are not immediately block
 
 ### T2-8 · CX Decomposition into Smaller Independently Releasable Packages
 **Cluster:** G1, G2 (was T4-1 — elevated)
+**Jira Epic (OM decoupling):** [CIM-33653 — CX Object Model Decoupling (The Distributed Monolith Deployment Bottleneck)](https://expertflow-docs.atlassian.net/browse/CIM-33653) · Assigned: Nabeel Ahmad · Status: In-Progress (started 2026-06-09)
 
 **Problem:** CX ships as a monolithic bundle. Stream-aligned teams cannot independently deploy, validate, or release their own services — every change must pass through the full monolithic integration cycle, inflating lead time, blast radius, and risk. CXAGENT, CXCHAN, CXVOICE, CXBI, and CXPLAT are logical package boundaries but currently ship together. The primary known blocker is the **Object Model (OM)** dependency, which requires manual updates across all components and prevents independent versioning.
 
 **Why it's Tier 2 (elevated from T4):** This is the strategic capability that gives stream teams genuine release autonomy — shorter feedback loops, targeted testing per package, and reduced upgrade risk for customers. OM version management has been elevated to Tier 1 (see T1-2 / CRM-706 scope); once OM is automated, decomposition becomes actionable.
 
-**Prerequisite:** OM versioning automation must be resolved first (part of T1-2 scope). Decomposition design can begin in parallel.
+**Prerequisite:** OM versioning automation must be resolved first (part of T1-2 scope). Decomposition design can begin in parallel. **Update (2026-06-17):** OM decoupling is now actively in progress under [CIM-33653](https://expertflow-docs.atlassian.net/browse/CIM-33653) (Nabeel) — migrating the ~40 microservices off shared compiled Java classes to a language-neutral contract system (central schema registry, automated pipelines, explicit versioning, loose binding). This unblocks the decomposition work below. [Background Confluence](https://expertflow-docs.atlassian.net/wiki/x/UICOPg).
 
 **What good looks like:**
 
@@ -619,7 +620,7 @@ The following items have the highest direct impact on stream-aligned team fricti
 |--------|-------|------|
 | **Zaryab Baloch** | T1-6, T2-4, T2-7, T2-11, T4-1, T4-6, T4-7 | Security Lead / Product Owner |
 | Haroon | T1-1, T1-4, T1-5, T2-1, T2-6, T2-7, T2-12, T2-13, T3-4, T3-8, T3-10, T4-1, T4-7 | RMT / DevOps |
-| Nabeel | T1-3, T2-3 | Stream lead |
+| Nabeel | T1-3, T2-3, T2-8 (OM decoupling — CIM-33653) | Stream lead |
 | Umar Naveed | T1-5, T2-6 | CD pipeline / QA |
 | Jawad | T2-5, T2-8, T3-5, T3-10 | Program management |
 | Umar Ikhlaq | T3-1 | Head of QA |
