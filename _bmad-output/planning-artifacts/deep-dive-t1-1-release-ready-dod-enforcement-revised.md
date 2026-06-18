@@ -195,50 +195,114 @@ The process changed, but the **enforcement mechanism** did not.
 
 ---
 
-## 6. Recommended First CI Gate: Jira `Release-Ready` Transition Validator
+## 6. T1-1 Status: Paused — ScriptRunner Approach Rejected
 
-Given the current state (manual RMT deployment, no CI smoke tests yet), the **highest-leverage first gate** is a **Jira workflow validator** on the `Release-Ready` status transition.
+> **Decision (June 2026):** After reviewing the Jira + GitLab integration options and ScriptRunner licensing requirements with Nabeel, the team has decided **not** to pursue a Jira workflow validator approach for Release-Ready DoD enforcement at this time. The effort and licensing cost outweigh the immediate value. T1-1 is **paused** — not abandoned — and will be revisited once the CI/CD pipeline is more mature.
+>
+> **Rationale:** The Release-Ready DoD is a process gate. Before we can enforce it with automation, the underlying pipeline (deploy → test → report) needs to exist. Building the enforcement layer before the validation layer creates a gate with nothing behind it. The team agreed to invest in the pipeline first, then add enforcement.
 
-### Why This Gate?
+### What Would Un-Pause T1-1
+
+| Condition | When |
+|-----------|------|
+| Automated regression runs reliably on every RMT deploy | After this initiative (§7 below) is stable |
+| CI can prove "RMT tested" with an artifact | When `RMT-Regression-Passed` is trustworthy |
+| Teams trust the automated result over manual QA sign-off | After 2–3 sprints of stable regression runs |
+
+---
+
+## 7. New Initiative: Post-RMT Playwright Regression Pipeline
+
+> **Scope:** This is **not** a DoD enforcement gate. It is a **new CI/CD pipeline stage** that completes the RMT deploy-test loop: package charts → deploy to RMT → **run automated regression** → publish results. It directly replaces manual QA regression on RMT with an automated, repeatable, fast-feedback mechanism.
+
+### Why Now?
 
 | Reason | Explanation |
 |--------|-------------|
-| **Process-native** | Fits the new two/three-MR model without changing team behavior |
-| **High frequency** | Every feature hits this path |
-| **Catches the core risk** | Prevents untested or incomplete features from being marked Release-Ready |
-| **Works with manual RMT** | Does not require T1-5 (automated CD) to be complete first |
-| **Single point of enforcement** | Jira is the system of record all teams already use |
+| **Completes the CI/CD flow** | Today: package → deploy → *manual test*. Target: package → deploy → **automated test** |
+| **No new licenses** | Uses existing GitLab CI + Playwright — no ScriptRunner or Forge app required |
+| **Direct pain-point relief** | Eliminates hours of manual regression on RMT; QA validates automatically |
+| **Fast feedback** | Regression results in minutes, not hours/days of waiting for manual QA |
+| **Enables future DoD enforcement** | Once this produces a trusted `RMT-Regression-Passed` artifact, T1-1 can be un-paused |
 
-### Gate Design
+### Pipeline Design
 
-**Mechanism:** Add a Jira workflow validator on the transition to `Release-Ready` that checks:
+Extend the cim-solution MR pipeline (MR-B: `feature/* → Release-Candidate`) with a post-deploy stage:
 
-1. **Microservice MR merged:** GitLab API query confirms MR-A (microservice repo → `develop`) is merged
-2. **cim-solution MR merged:** GitLab API query confirms MR-B (cim-solution → `Release-Candidate`) is merged
-3. **MRs reference same Jira ticket:** Both MR descriptions contain the Jira ticket ID (`CIM-XXX`)
-4. **transflux MR merged (conditional):** If the Jira ticket has the label `mongodb-change`, confirm MR-C (transflux → `develop`) is merged
-5. **QA-Passed:** Jira status = `QA-Passed`
-6. **BAT or waiver:** Jira status = `BAT-Passed` OR a comment contains `BAT-WAIVED:` with PO name
+```
+cim-solution MR opened
+        │
+        ▼
+┌───────────────────────────────────────┐
+│  CI Stage 1: Package & Validate       │
+│  • helm lint (blocking)               │
+│  • image tag resolution check         │
+│  • upgrade script presence (conditional)│
+└───────────────────────────────────────┘
+        │
+        ▼
+┌───────────────────────────────────────┐
+│  CI Stage 2: Deploy to RMT (T1-5)     │
+│  • Native GitLab agent → Helm upgrade │
+│  • Wait for rollout completion        │
+└───────────────────────────────────────┘
+        │
+        ▼
+┌───────────────────────────────────────┐
+│  CI Stage 3: Playwright Regression    │  ◄── NEW
+│  • Trigger regression suite vs RMT    │
+│  • Target: @regression tag            │
+│  • Publish HTML + JUnit report        │
+│  • Update Jira: RMT-Test-Result       │
+└───────────────────────────────────────┘
+        │
+        ▼
+┌───────────────────────────────────────┐
+│  CI Stage 4: Notify                   │
+│  • Slack notification to stream team  │
+│  • Update RC build status page (T1-4) │
+│  • Publish test report link           │
+└───────────────────────────────────────┘
+```
 
-**Error messages:**
-- If MR-A not merged: *"Cannot mark Release-Ready: Microservice MR not yet merged. Complete RMT testing and merge all required MRs first."*
-- If MR-B not merged: *"Cannot mark Release-Ready: cim-solution MR not yet merged."*
-- If MR-C required but not merged: *"Cannot mark Release-Ready: MongoDB changes require transflux MR to be merged."*
-- If BAT missing: *"Cannot mark Release-Ready: BAT not completed. Complete BAT or document a waiver in Jira."*
+**What the regression suite validates:**
+1. Core chat flows (agent login, webchat routing, conversation lifecycle)
+2. Supervisor flows (monitoring, whisper, barge-in)
+3. Key integration surfaces (Keycloak auth, conversation manager APIs)
 
-**Implementation options:**
-- **Option A (preferred):** Jira ScriptRunner (Adaptavist) — most flexible, requires license
-- **Option B:** Jira built-in workflow validator with JQL + GitLab integration (if enabled)
-- **Option C:** Custom Jira app or webhook service
+> **Scope note:** Umar Ikhlaq's Playwright framework (`qa-automation-playwright`) currently targets **70% chat use-case coverage**. This pipeline runs the `@regression` tag from that repo. Coverage expansion to 85%+ is tracked as T3-1.
 
-### Phase 2 Gate (After T1-5 Completes)
+**Result publishing (lightweight, no Jira integration):**
+- Test results published as GitLab CI artifacts:
+  - HTML report (browsable)
+  - JUnit XML (`artifacts:reports:junit` for MR test result visualization)
+- Slack notification to stream team channel with pass/fail summary + artifact link
+- No Jira fields, no service accounts, no external API calls — everything lives in GitLab CI + Slack
 
-Once Umar Naveed completes T1-5 (GitLab CD Pipeline) and RMT deployment is automated:
+**What this replaces:**
+- Manual QA regression on RMT (hours, human-dependent, done ad-hoc)
+- "Did someone test this on RMT?" tribal knowledge
 
-Replace the manual Jira checks with CI-validated artifacts:
-- Add a `RMT-Test-Result` Jira custom field
-- CI job post-RMT-deploy updates the field: `Passed` or `Failed`
-- Jira validator checks `RMT-Test-Result = Passed` instead of just checking MR merge status
+**What this does NOT do (intentionally out of scope):**
+- Block MR-A (microservice → `develop`) or MR-B (cim-solution → RC) merges
+- Enforce Release-Ready DoD criteria
+- Replace manual feature-level QA testing
+
+### Pre-Requisites & Dependencies
+
+| Prerequisite | Status | Owner | Notes |
+|-------------|--------|-------|-------|
+| T1-5 RMT deploy stage | ✅ **Ready** | Umar Naveed | Demo complete; runner already reaches RMT |
+| Playwright regression suite (`qa-automation-playwright`) | ✅ 70% coverage | Umar Ikhlaq | Runtime: ~10 min for full suite |
+| Playwright `BASE_URL` from env var | 🔄 5-min check | Umar Ikhlaq | `process.env.BASE_URL` in config |
+| Test user credentials as GitLab CI variables | 🔄 Add to project settings | Haroon / RMT | Masked variables: `TEST_USER`, `TEST_PASS` |
+| T1-4 Slack webhook | 🔄 In progress | Haroon / RMT | Reuse for regression result notification |
+
+**What we DON'T need (deliberately excluded):**
+- Jira custom fields — not needed for informational pipeline
+- GitLab CI service account — no external API calls
+- Headless mode verification — Playwright runs headless automatically when `CI=true`
+- Network connectivity test — already proven by deployment pipeline
 
 ---
 
@@ -257,33 +321,42 @@ Replace the manual Jira checks with CI-validated artifacts:
 | transflux MR opened (conditional) | MR exists for MongoDB features | ✅ GitLab API | ✅ GitLab API |
 | Image tags valid | Referenced `image:tag` exists in registry | ✅ CI job (can add) | ✅ CI job |
 | **RMT deployed** | **Manual:** Haroon confirms deploy | ❌ Manual only | ✅ GitLab CD |
-| **RMT tested** | **Manual:** QA updates Jira | ❌ Manual only | ⚠️ Still manual QA; can add smoke test |
+| **RMT tested** | **Automated:** Playwright regression passes on RMT deploy | ❌ Manual only | ✅ Playwright in CI (after T1-5) |
 | **Parallel RMT safe** | No overlapping microservice in active RMT test | ❌ Manual (Haroon manages) | ⚠️ Needs component reservation logic |
 | All required MRs merged | `merge_commit_sha` exists for MR-A, MR-B, (MR-C) | ✅ GitLab API | ✅ GitLab API |
 | Docs updated | `Documentation Links` Jira field non-empty | Partial | Partial |
 | BAT or waiver | `Jira status = BAT-Passed` OR comment `BAT-WAIVED:` | ✅ Jira API | ✅ Jira API |
 
-### Deliverable 2: First Gate Specification
+### Deliverable 2: Playwright Regression Pipeline Stage — Specification
 
-**Gate:** `G3.4` — Jira `Release-Ready` transition validator
+> **Not a gate.** This is an **informational pipeline stage** that produces a test result artifact. It does not block merges or enforce DoD. Blocking will be considered only after the suite is proven stable (see §6 for T1-1 un-pause conditions).
+
+**Pipeline Stage:** `regression-test` — Post-RMT Playwright Regression + CI Result Artifact
 
 **Specification:**
-- **Trigger:** User attempts to transition Jira ticket to `Release-Ready`
-- **Validation logic:**
-  1. Query GitLab API for MRs referencing this Jira ticket (`CIM-XXX`)
-  2. Confirm at least 2 MRs exist and are merged:
-     - One to a microservice repo's `develop` branch (MR-A)
-     - One to `cim-solution`'s `Release-Candidate` branch (MR-B)
-  3. If Jira ticket has label `mongodb-change`, confirm a 3rd MR to `transflux` `develop` is merged (MR-C)
-  4. Confirm Jira status = `QA-Passed`
-  5. Confirm `BAT-Passed` status OR a Jira comment matching `BAT-WAIVED: .* by .*`
-- **Blocking:** If any check fails, transition is blocked with specific error message
-- **Audit log:** Log all validation attempts (pass/fail) for compliance tracking
+- **Trigger:** cim-solution MR-B (`feature/* → Release-Candidate`) pipeline reaches post-deploy stage
+- **Execution logic:**
+  1. Helm deploy to RMT completes successfully (T1-5 CD stage)
+  2. Pipeline job checks out `qa-automation-playwright` repo at matching branch/tag
+  3. Job runs Playwright regression suite against RMT environment URL:
+     - `npx playwright test --grep @regression --reporter=junit,html`
+  4. Test results published as GitLab CI artifacts:
+     - HTML report (browsable)
+     - JUnit XML (`artifacts:reports:junit`)
+  5. Slack notification fires to stream team channel (T1-4 webhook) with pass/fail summary + artifact link
+- **Non-blocking:** Stage failure does **not** block MR-B merge. The result is informational.
+- **Audit trail:** All results in GitLab CI job logs + artifacts
 
 **Rollout plan:**
-- Week 1 (June 8–12): Design validator, confirm Jira admin access, document spec
-- Week 2 (June 15–19): Implement validator in Jira test project, pilot with CXAGENT team
-- Week 3 (June 22–26): Roll out to all stream teams, train tech leads
+- Week 1 (June 8–12): Document spec; confirm Playwright repo is CI-runnable (headless, env config)
+- Week 2 (June 15–19): Add Jira custom fields; create GitLab CI service account
+- Week 3 (June 22–26): Implement post-deploy stage in cim-solution pipeline (test project); pilot with CXAGENT team
+- Week 4 (June 29–July 3): Validate stability on 3–5 real features; tune flaky tests; roll out to all stream teams
+
+**When this becomes a gate (future):**
+- After 2–3 sprints of stable runs with <5% flaky test rate
+- After QA and stream leads confirm they trust the automated result over manual regression
+- After T1-1 is un-paused and DoD enforcement is revisited
 
 ---
 
@@ -295,9 +368,12 @@ Replace the manual Jira checks with CI-validated artifacts:
 | How does RMT deployment trigger? | ✅ Answered | **Manual today** (Haroon/Junaid). Will be automated by Umar Naveed's T1-5 (GitLab CD Pipeline) |
 | Can two features be tested in parallel on RMT? | ✅ Answered | **Collision = same microservice**. Different microservices = parallel OK. |
 | Where are MongoDB upgrade DAGs stored? | ✅ Answered | **Separate `transflux` repository** — NOT in cim-solution |
-| Which GitLab project IDs are the microservice repos? | 🔄 Open | Haroon to provide canonical list; store in Jira app config |
-| Does Jira have a GitLab integration enabled? | 🔄 Open | Check if MR status is already visible in Jira; if not, need ScriptRunner or custom webhook |
-| Who can create Jira workflow validators? | 🔄 Open | Requires Jira admin or Adaptavist ScriptRunner. Identify admin; estimate 1–2 days to implement |
+| Which GitLab project IDs are the microservice repos? | ✅ Resolved | Not needed for CI gate approach; pipeline operates within cim-solution + Playwright repos |
+| Does Jira have a GitLab integration enabled? | ✅ Resolved | Not needed; pipeline uses REST API directly with service account |
+| Who can create Jira workflow validators? | ✅ Resolved | **Not applicable** — approach changed to CI-driven; no Jira validators required |
+| Can Playwright run headless against RMT from GitLab CI? | ✅ Confirmed | Playwright runs headless by default when `CI=true`. RMT reachability proven by deployment pipeline |
+| How long does the full `@regression` suite take to run? | ✅ Confirmed | ~10 minutes for 70% coverage — acceptable for CI stage |
+| Does the Playwright repo need CI-specific config? | ✅ Resolved | `BASE_URL`, credentials, queue name, customer name all read from env vars. Config complete. |
 | What is the exact file path convention for DB upgrade scripts? | 🔄 Open | Naming pattern appears to be `*_db_update_script_{DBTYPE}_{from}_to_{to}.sql`. Confirm with Haroon/Nabeel |
 | Are transflux DAGs versioned with the release? | 🔄 Open | Transflux is a separate repo — need to confirm branching model (does it mirror cim-solution release branches?) |
 | How does Haroon track RMT component reservations today? | 🔄 Open | Document current manual process before designing automation |
@@ -308,12 +384,20 @@ Replace the manual Jira checks with CI-validated artifacts:
 
 - [ ] Updated objective DoD criteria document reflecting the new RMT-first + three-repo model
 - [ ] Haroon + at least 2 stream tech leads have reviewed and agreed on the criteria
-- [ ] First gate specified: Jira `Release-Ready` transition validator design documented
-- [ ] GitLab-Jira integration status confirmed (enabled/disabled + MR visibility)
-- [ ] Jira admin contacted for workflow validator feasibility (ScriptRunner availability)
-- [ ] Canonical list of microservice GitLab project IDs requested from Haroon
-- [ ] Rollout plan: pilot with one stream team (recommend CXAGENT — most mature CI)
+- [x] T1-1 approach decided: **Paused** — ScriptRunner rejected; DoD enforcement deferred
+- [x] ScriptRunner approach rejected: licensing cost + effort not justified
+- [x] T1-1 criteria document updated to reflect paused status
+- [x] Playwright regression pipeline spec documented (§7)
+- [x] Playwright repo confirmed to read `BASE_URL` from env var — verified in CI
+- [x] Test user credentials added as masked GitLab CI variables
+- [x] All 10 test suites pass in CI (4.7 minutes, headless, against mtt02)
+- [ ] Merge `feature/ci-playwright-config` branch to `main`
+- [ ] Integrate regression stage into cim-solution `.gitlab-ci.yml`
+- [ ] Pilot with real RMT feature deploy (CXAGENT team)
+- [ ] Validate stability over 3–5 real feature deployments
 
 ---
 
-*Document produced: June 8, 2026 | Revisions: Incorporates May 6, 2026 process update + stakeholder clarifications on upgrade scripts, RMT deployment, parallel testing, transflux repo location, and component definition.*
+*Document produced: June 8, 2026 | Last updated: June 17, 2026*
+
+*Revisions: Incorporates May 6, 2026 process update + stakeholder clarifications on upgrade scripts, RMT deployment, parallel testing, transflux repo location, and component definition. June 17 update: T1-1 paused (ScriptRunner rejected), T1-1b Playwright regression pipeline delivered — all 10 suites pass in CI (4.7 min).*
