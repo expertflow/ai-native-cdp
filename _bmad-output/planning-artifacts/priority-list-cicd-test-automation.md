@@ -38,10 +38,66 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 
 **Cognitive load angle:** A clear, enforced DoD removes ambiguity for developers. They know exactly when they're done. No more "are we ready?" conversations — the system answers.
 
+**Status: ⏸️ PAUSED (June 2026)**
+> The original plan — a Jira workflow validator using ScriptRunner — was reviewed with Nabeel and **rejected** due to licensing cost and implementation effort not justified by the value. Rather than substitute a different enforcement mechanism, the team agreed to **pause T1-1** and invest in the underlying pipeline first (automated regression on RMT — see **T1-1b** below). Once the pipeline produces a trusted `RMT-Regression-Passed` artifact, T1-1 will be revisited.
+>
+> **Un-pause conditions:** (1) Automated regression runs reliably on every RMT deploy, (2) QA and stream leads trust the result over manual regression, (3) 2–3 sprints of stable runs with <5% flaky test rate.
+
 **DRI suggestion:** Haroon + stream tech leads  
 **Effort:** Medium — process design + CI gate implementation
 
-**Start week:** June 8, 2026 — target: draft DoD criteria and identify first CI gate to enforce
+**Start week:** Deferred — revisit after T1-1b is stable
+
+---
+
+### T1-1b · Post-RMT Automated Regression (Playwright) — NEW
+
+**Problem:** The cim-solution CI/CD pipeline ends at deployment. There is no automated testing stage after RMT deploy. Every RMT deployment requires manual QA regression — hours of human-dependent work that delays feedback and bottlenecks the release pipeline.
+
+**Why it's Tier 1:** This completes the RMT CI/CD loop (package → deploy → **test**) and directly addresses the most painful manual step in the release cycle. It is the highest-leverage use of Umar Ikhlaq's existing 70% Playwright coverage. It also unblocks T1-1 (DoD enforcement) by producing the trusted artifact (`RMT-Regression-Passed`) that any future gate would need.
+
+**What good looks like:**
+- Every cim-solution MR-B (`feature/* → Release-Candidate`) triggers a 4-stage pipeline: package → deploy → **regression** → notify
+- Playwright `@regression` suite runs automatically against the newly deployed RMT environment
+- Results published as CI artifacts (HTML + JUnit) and posted to Jira custom fields (`RMT-Regression-Passed`, `RMT-Regression-Run-URL`)
+- Stream team notified via Slack with pass/fail summary + report link
+- QA validates automatically, not by hand — reducing RMT regression from hours to minutes
+
+**Explicitly out of scope (for now):**
+- Blocking MR merges based on regression result
+- Enforcing Release-Ready DoD criteria
+- Replacing manual feature-level QA testing
+
+**Dependencies:**
+- T1-5 RMT deploy stage — ✅ **Ready** (Umar Naveed demo complete)
+- Playwright `BASE_URL` from env var — ✅ Verified in CI (reads from `process.env`)
+- Test user credentials as GitLab CI variables — ✅ Added and working
+
+**What we DON'T need:** Jira custom fields, service accounts, or external API integrations. Results live in GitLab CI artifacts + Slack.
+
+**Results (June 17, 2026):**
+| Metric | Value |
+|--------|-------|
+| Tests run | 10/10 suites |
+| Passed | 10 (13 feature checks) |
+| Failed | 0 |
+| Runtime | **4.7 minutes** |
+| Environment | `mtt02.expertflow.com` (headless, CI) |
+| Artifacts | HTML report uploaded |
+
+**Full suite breakdown:**
+| Suite | Feature | Time | Status |
+|-------|---------|------|--------|
+| 1 | Basic Chat | 34.8s | ✅ PASSED |
+| 2 | Agent Consult | 53.9s | ✅ PASSED |
+| 3 | Agent Transfer | 63.9s | ✅ PASSED |
+| 4 | Queue Transfer | 58.0s | ✅ PASSED |
+| 5–10 | Stubs (MRD, State, Login, Widget, Notifications, Validation) | 6–14s each | ✅ PASSED |
+
+**DRI:** Haroon + Umar Ikhlaq (Playwright) + Umar Naveed (CD pipeline)  
+**Effort:** Low — pipeline stage + artifact publishing + Slack notification wiring
+
+**Status:** ✅ **Repo CI-ready** — Next: integrate into cim-solution pipeline + pilot with real RMT deploy
 
 ---
 
