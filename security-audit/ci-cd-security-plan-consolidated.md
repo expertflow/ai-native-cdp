@@ -566,7 +566,25 @@ gitlab_build_merge:
 
 ---
 
+## Appendix A — Dependency Strategy Update (2026-06-19)
+
+**Context:** Security Lead completed T1-6 approach finalization and R&D on multi-layer packaging + centralized hardened dependency images.
+
+**Team decision:** Manual Security-maintained hardened dependency images at scale are **not continued**. Documented in team artifacts (same pattern as other workstreams):
+
+| Topic | Location |
+|-------|----------|
+| Meeting notes & action items | `team_input/Road to CD.md` — June 2026 security section |
+| Gap analysis | `docs/cicd_objectives_gaps.md` — Gap 9 (R&D closed), Gap 3 (Renovate/Dependabot) |
+| Problem inventory | `problem-inventory-cicd-test-automation.md` §7.6, §7.8–7.23 |
+| Priority & status | `priority-list-cicd-test-automation.md` — T1-6, T2-7 Phase 2C, T2-12 |
+
+**Revised scope:** Renovate or Dependabot MRs to **develop** + T1-6 blocking gates + T2-10 build-time scans + T2-12 multi-stage Dockerfiles.
+
+---
+
 > **Document maintained by:** Mary (Business Analyst)  
+> **Last updated:** 2026-06-19 (Appendix A — Zaryab dependency strategy pivot)  
 > **Reviewed by:** Murat (Test Architect)  
 > **Next review:** After Phase 1 completion (1 week)  
 > **Escalation path:** Winston (Architect) for technical validation → John (PM) for scope changes
