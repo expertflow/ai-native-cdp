@@ -66,10 +66,52 @@ Many CVEs flagged by Trivy are in outdated dependencies, not code. Without autom
 The master pipeline mentions Trivy scanning (detect) but has no strategy for remediation automation (fix). This is the upstream step that reduces the Trivy alert volume.
 
 **Questions to resolve:**
-- Renovate (free, self-hosted) vs Snyk (paid, more opinionated) — decision needed
+- Renovate (free, self-hosted) vs Snyk (paid, more opinionated) vs GitLab Dependabot — decision needed
 - Should the dependency update bot target only CVE-flagged deps or all outdated deps?
 - How do MRs from the bot get reviewed — automated approval for patch versions? Tech Lead review for minor/major?
 - Java (Maven) and Node components are clear candidates; what about Helm chart dependencies?
+
+**Status (2026-06-19):** Zaryab (Security Lead) evaluating **Renovate vs Dependabot** after multi-layer hardened-image R&D concluded (see Gap 9). Bot should target **develop** as source of truth; MR author owns regression fixes when CI fails after bot merge.
+
+---
+
+## Gap 9 — Multi-Layer Packaging & Centralized Dependency Hardening
+
+> **Status: R&D complete — not continued.** Alternative approach selected (Gap 3 + T2-12 in security priority list).
+
+**What was explored (June 2026):**  
+Security Lead R&D on offloading dependency CVE management from developers via:
+
+1. **Multi-layer packaging** — build tools in a heavy build stage; lightweight runtime artifact image only
+2. **Centralized hardened dependency platform** — Security team maintains patched dependency sets; developers build features on top; scheduled scans on **develop** as source of truth; notify devs when new hardened images release
+
+**Why it was not continued:**
+
+| Challenge | Why it blocked adoption |
+|-----------|-------------------------|
+| Parallel feature branches | Each branch adds deps; hardened image can lag behind develop merge |
+| Hundreds of deps × many repos | Continuous Security-owned image rebuild cycle not scalable |
+| Regression attribution | Requires heavy GitLab automation to assign failures to feature owners |
+| Existing tooling | Trivy, Grype, SonarQube, npm audit, OWASP DC already detect CVEs — gap is **enforcement + automated remediation**, not a new image factory |
+
+**Agreed alternative (same goals, simpler path):**
+
+| Need | Where it lives |
+|------|----------------|
+| Developers don't ignore CVEs | **T1-6** — blocking security gates |
+| Detect deps at build time | **T2-10** — npm audit + OWASP Dependency-Check on MR |
+| Automated CVE remediation | **Gap 3 / T2-7** — Renovate or Dependabot MRs to develop |
+| Lightweight runtime images | **T2-12** — multi-stage Dockerfile standard (build stage vs runtime stage) |
+| Cross-repo inventory | **T4-1** — SBOM (Phase 3) |
+
+**R&D questions answered (for reference):**
+
+- Track new deps across feature branches? → MR pipeline scans lockfile diff; bot runs on **develop** only
+- Notify developers of dependency updates? → Bot MR + Slack/webhook, not manual hardened-image releases
+- Catch regressions from Security-side fixes? → Bot MR triggers full develop CI; failure assigns to MR author / CODEOWNERS
+
+**DRI:** Zaryab Baloch (R&D); Haroon (DevOps) for T2-12 template implementation  
+**Next step:** Renovate vs Dependabot PoC on one Node + one Java repo (Gap 3)
 
 ---
 
@@ -187,9 +229,10 @@ The master pipeline references Release on Demand in Phase 5 (RoD) but has no str
 |-----|---------|-----------------|----------------|
 | WCAG Compliance | Medium (customer ask) | QA Lead + Dev Leads | Not started (T4-2) |
 | Vulnerability mgmt all releases | High (customer trust) | RMT + Abdul Moeed | Action item open (T2-4) |
-| Automated dependency updates | Medium | DevOps / RMT | Not started (T2-7) |
+| Automated dependency updates | Medium | Zaryab + DevOps / RMT | R&D on hardened images done — Renovate/Dependabot eval in progress (Gap 3, Gap 9) |
 | Load test environment | Medium | RMT + QA | Infra exists; wiring + thresholds pending (T2-6) |
 | Multi-step Helm upgrade hooks | High (upgrade reliability) | Haroon Ahmed | In progress — CRM-706 open (T1-2) |
 | SonarQube Dev vs Community targets | N/A | N/A | Deliberate design choice — not a gap |
 | CD vs CI strategic distinction | Low (clarity/framing) | Jawad | Acknowledged — deferred (T4-3) |
 | Smaller CX packages (OM dependency) | High (stream autonomy) | Jawad + Haroon + stream leads | Elevated to T2-8; OM unblocking is T1 |
+| Multi-layer packaging / hardened dep platform | N/A (R&D closed) | Zaryab | R&D complete — not continued; see Gap 9 |
