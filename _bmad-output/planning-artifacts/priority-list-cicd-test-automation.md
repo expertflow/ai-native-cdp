@@ -1,9 +1,9 @@
 # Priority List: CI/CD, Test Automation & Delivery Process
 
-> **Status:** Active — Working Backlog (Round 3 — June 2026)  
-> **Produced by:** Problem Inventory analysis + stakeholder corrections + security audit (June 2026)  
-> **Sources:** `problem-inventory-cicd-test-automation.md`, `security-audit/ci-cd-security-plan-consolidated.md`, `docs/cicd_objectives_gaps.md`, `team_input/Road to CD.md`, Confluence retro pages, direct stakeholder input (Haroon — RMT, Junaid — RMT, Zaryab Baloch — Security Lead/PO)  
-> **Last updated:** 2026-06-19  
+> **Status:** Active — Working Backlog (Round 2 — updated June 2026)
+> **Produced by:** Problem Inventory analysis + stakeholder corrections (June 2026)
+> **Sources:** `problem-inventory-cicd-test-automation.md`, `docs/cicd_objectives_gaps.md`, `team_input/Road to CD.md`, Confluence retro pages, direct stakeholder input (Haroon — RMT, Junaid — RMT)
+> **Last updated:** 2026-06-30
 
 ---
 
@@ -59,6 +59,8 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 
 ### T1-1b · Post-RMT Automated Regression (Playwright) — NEW
 
+**Jira:** [CRM-765 — Integrate Playwright regression into cim-solution CI/CD pipeline](https://expertflow-docs.atlassian.net/browse/CRM-765) · Assigned: Haroon Ahmed · Status: **Resolved**
+
 **Problem:** The cim-solution CI/CD pipeline ends at deployment. There is no automated testing stage after RMT deploy. Every RMT deployment requires manual QA regression — hours of human-dependent work that delays feedback and bottlenecks the release pipeline.
 
 **Why it's Tier 1:** This completes the RMT CI/CD loop (package → deploy → **test**) and directly addresses the most painful manual step in the release cycle. It is the highest-leverage use of Umar Ikhlaq's existing 70% Playwright coverage. It also unblocks T1-1 (DoD enforcement) by producing the trusted artifact (`RMT-Regression-Passed`) that any future gate would need.
@@ -67,7 +69,7 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 - Every cim-solution MR-B (`feature/* → Release-Candidate`) triggers a 4-stage pipeline: package → deploy → **regression** → notify
 - Playwright `@regression` suite runs automatically against the newly deployed RMT environment
 - Results published as CI artifacts (HTML + JUnit) and posted to Jira custom fields (`RMT-Regression-Passed`, `RMT-Regression-Run-URL`)
-- Stream team notified via Slack with pass/fail summary + report link
+- Stream team notified via Google Chat with pass/fail summary + report link
 - QA validates automatically, not by hand — reducing RMT regression from hours to minutes
 
 **Explicitly out of scope (for now):**
@@ -80,7 +82,7 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 - Playwright `BASE_URL` from env var — ✅ Verified in CI (reads from `process.env`)
 - Test user credentials as GitLab CI variables — ✅ Added and working
 
-**What we DON'T need:** Jira custom fields, service accounts, or external API integrations. Results live in GitLab CI artifacts + Slack.
+**What we DON'T need:** Jira custom fields, service accounts, or external API integrations. Results live in GitLab CI artifacts + Google Chat.
 
 **Results (June 17, 2026):**
 | Metric | Value |
@@ -101,10 +103,18 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 | 4 | Queue Transfer | 58.0s | ✅ PASSED |
 | 5–10 | Stubs (MRD, State, Login, Widget, Notifications, Validation) | 6–14s each | ✅ PASSED |
 
-**DRI:** Haroon + Umar Ikhlaq (Playwright) + Umar Naveed (CD pipeline)  
-**Effort:** Low — pipeline stage + artifact publishing + Slack notification wiring
+**cim-solution Integration (CRM-765):**
+| Date | Update |
+|------|--------|
+| June 23, 2026 | `regression-test` job integrated into `cim-solution` and verified |
+| June 29, 2026 | `notify-google-chat` job integrated and tested with `cim-solution` |
 
-**Status:** ✅ **Repo CI-ready** — Next: integrate into cim-solution pipeline + pilot with real RMT deploy
+Confirmed directly in `cim-solution/.gitlab-ci.yml`: `notify-google-chat` runs `on_success` while `regression-test` has `allow_failure: true` — so the notification fires on every regression run **regardless of pass/fail**, not just on failure. The only condition that suppresses it today is `regression-test` never being triggered at all (it's currently `when: manual`).
+
+**DRI:** Haroon + Umar Ikhlaq (Playwright) + Umar Naveed (CD pipeline)  
+**Effort:** Low — pipeline stage + artifact publishing + Google Chat notification wiring
+
+**Status:** ✅ **Integrated & verified in cim-solution** (CRM-765 Resolved) — `regression-test` + `notify-google-chat` both live. Still manual-trigger pending CRM-763 (T1-5) auto-deploy; will switch to automatic once that lands.
 
 ---
 
@@ -159,16 +169,18 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 
 **What good looks like:**
 
-- When RMT cuts a new incremental RC build, an automated notification fires to all stream teams (Slack + Jira comment or Confluence page update)
+- When RMT cuts a new incremental RC build, an automated notification fires to all stream teams (Google Chat + Jira comment or Confluence page update)
 - The current RC build version is always visible in one canonical place, updated by CI automatically
 
 **Phase 1 — Notification (current scope):**
 Notification fires automatically when a new incremental RC build is deployed. Stream teams are informed and can manually update their environments.
 
-**DRI:** Haroon / RMT  
-**Effort:** Low — CI step + Slack webhook
+**Status update (June 30, 2026):** The delivery mechanism for Phase 1 is effectively solved as a byproduct of T1-1b/CRM-765 — `notify-google-chat` already posts a card (branch, author, results) to Google Chat on every regression run, firing regardless of pass/fail. Today that's gated on `regression-test`'s manual trigger; once T1-5/CRM-763 switches `regression-test` to automatic (`on_success` + `needs: [deploy_charts]`), every RC build advance triggers this same notification automatically — no separate webhook build needed. **Remaining gap:** the second bullet above (a canonical, always-current place showing the RC build version) is not addressed by the regression notification and stays open — still needs its own owner/decision.
 
-**Start week:** June 8, 2026 — target: Slack webhook wired to RC build completion event
+**DRI:** Haroon / RMT  
+**Effort:** Low — now mostly a dependency on CRM-763 landing, not new wiring (reuses T1-1b's Google Chat webhook)
+
+**Start week:** June 8, 2026 — target: Google Chat webhook wired to RC build completion event (superseded by reuse of T1-1b's webhook — see status update above)
 
 **Phase 2 — Auto-update stream environments (follow-on after T1-5):**
 Once the CD pipeline (T1-5 / CRM-763) is stable, stream-aligned team environments are automatically updated with the latest RC build following the notification — no manual action required from stream teams.
