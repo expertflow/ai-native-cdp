@@ -1,9 +1,9 @@
 # Problem Inventory: CI/CD, Test Automation & Delivery Process
 
-> **Status:** Updated — Round 2 (June 2026)
-> **Sources:** `docs/How_We_Work.md`, `team_input/Road to CD.md`, `team_input/QA Automation (BDD + Playwright)..md`, `docs/cicd_objectives_gaps.md`, direct stakeholder input (Haroon — RMT, Junaid — RMT)
-> **Last updated:** 2026-06-03
-> **Goal:** Complete inventory before moving to solution design
+> **Status:** Active — includes security audit findings (June 2026)  
+> **Sources:** `docs/How_We_Work.md`, `team_input/Road to CD.md`, `docs/cicd_objectives_gaps.md`, `security-audit/ci-cd-security-plan-consolidated.md`, `.gitlab-ci.yml` (Node + Java pipelines), direct stakeholder input (Haroon — RMT, Junaid — RMT, Zaryab Baloch — Security Lead)  
+> **Last updated:** 2026-06-19  
+> **Goal:** Complete inventory before prioritization — see `priority-list-cicd-test-automation.md`  
 
 ---
 
@@ -243,14 +243,107 @@
 ### 7.5 No Automated Dependency Update Strategy
 - **Problem:** Many CVEs flagged by Trivy originate from outdated dependencies, not from custom code. There is no automated dependency update process — neither a CI step (`mvn versions:use-latest-releases`, `npm-check-updates`) nor a bot (Renovate, Snyk).
 - **Impact:** Dependency debt grows faster than teams can manually address it. Trivy alert volume is inflated by known, fixable issues.
-- **Evidence:** CI/CD Objectives Gap 3 — two-phase approach defined but not implemented. Decision needed on Renovate vs Snyk.
+- **Evidence:** CI/CD Objectives Gap 3 — two-phase approach defined but not implemented. Decision needed on Renovate vs Snyk vs Dependabot.
 - **Source:** `docs/cicd_objectives_gaps.md` (Gap 3)
 
-### 7.6 No WCAG Accessibility Compliance
+### 7.6 Multi-Layer Packaging & Hardened Dependency Platform (R&D closed)
+- **Problem:** Developers carry cognitive load for dependency CVEs; runtime images may include unnecessary build tooling. June 2026 R&D explored a centralized Security-maintained hardened dependency image platform across all GitLab repos.
+- **R&D outcome:** **Not continued** — operational complexity (parallel feature branches, develop sync, regression attribution) exceeds team capacity. Alternative: Gap 3 bots + T1-6 gates + T2-12 multi-stage Dockerfiles.
+- **Evidence:** `docs/cicd_objectives_gaps.md` Gap 9; `team_input/Road to CD.md` June 2026 security section
+- **Source:** Security Lead team alignment June 2026
+
+### 7.7 No WCAG Accessibility Compliance
 - **Problem:** Customer-facing accessibility compliance (WCAG) was implemented in Hybrid Chat but abandoned in 2021. It is not mentioned in the master pipeline or QA roadmap. Customers are now actively requesting it.
 - **Impact:** Sales opportunities and enterprise deals can be blocked. Compliance debt grows as the UI evolves without accessibility considerations.
 - **Evidence:** CI/CD Objectives Gap 1 — target level undefined, ownership unclear (QA vs dev), not a CI gate.
 - **Source:** `docs/cicd_objectives_gaps.md` (Gap 1)
+
+### 7.8 All Security Scans Run with `allow_failure: true`
+- **Problem:** Every vulnerability scanner in both Node.js and Java pipelines — Trivy, Grype, and SonarQube — is configured with `allow_failure: true`. A CRITICAL CVE produces a red report that no one reads, and the image is still pushed and deployed.
+- **Impact:** Security scans provide a false sense of safety. This is the single highest-leverage security intervention in the pipeline. Maps to **T1-6**.
+- **Evidence:** Both `.gitlab-ci.yml` files show `allow_failure: true` on all scan jobs. SonarQube has `-Dsonar.qualitygate.wait=true` but job still allows failure.
+- **Source:** Direct pipeline inspection
+
+### 7.9 SonarQube Quality Gate Has No Teeth
+- **Problem:** Two SonarQube instances (local lab 80%, live 90%) with no clear ownership. Neither blocks the pipeline because `allow_failure: true` overrides the quality gate.
+- **Impact:** Security hotspots, injection flaws, and coverage drops flow into releases unchecked.
+- **Evidence:** Frontend uses `sonarqube.expertflow.com:9000`; backend uses `sonarqube-live.expertflow.com`. Both have `allow_failure: true`.
+- **Source:** `.gitlab-ci.yml` pipeline inspection
+
+### 7.10 No Secret Scanning in CI/CD
+- **Problem:** Neither pipeline runs secret detection. No pre-commit hooks configured.
+- **Impact:** Committed secrets are the #1 cause of cloud breaches. Maps to **T2-11**.
+- **Evidence:** No TruffleHog, GitLeaks, or detect-secrets stage. `SONAR_PASS` variables in plaintext YAML references.
+- **Source:** Direct pipeline inspection; OWASP CI/CD Security Top 10
+
+### 7.11 No Build-Time Dependency Scanning (Node + Java)
+- **Problem:** `npm audit` never runs; Java has no OWASP Dependency-Check. Node uses `npm install --legacy-peer-deps`.
+- **Impact:** Transitive CVEs in build tools and dev dependencies invisible to container scanning. Maps to **T2-10**.
+- **Evidence:** No audit step in `node_artifacts_frontend`; no OWASP plugin in `pom.xml`.
+- **Source:** `.gitlab-ci.yml` and `pom.xml` inspection
+
+### 7.12 Trivy Only Scans Container Image, Not Filesystem
+- **Problem:** Trivy scans final Docker image only — not `node_modules` or `.m2/repository` before build.
+- **Impact:** Dev dependency and build-tool CVEs completely invisible.
+- **Evidence:** `.trivy_scan_template` defines image scanning only; no `trivy fs` job.
+- **Source:** `.gitlab-ci.yml` include inspection
+
+### 7.13 Grype Runs Redundantly Alongside Trivy
+- **Problem:** Both scanners run on every build with ~95% overlap, adding 3–5 minutes per build.
+- **Impact:** Wasted CI time at ~50 MRs/week. Conflicting severity reports for same CVE.
+- **Evidence:** Both `trivy_scanning_branch` and `grype_scan_branch` run after build with `allow_failure: true`.
+- **Source:** Pipeline inspection
+
+### 7.14 Docker Base Images Not Pinned to SHA Digests
+- **Problem:** Dockerfiles use mutable tag-based `FROM` statements. `docker build --pull` fetches latest tag content.
+- **Impact:** Supply chain tampering vector — no guarantee today's base image matches yesterday's. Maps to **T2-12**.
+- **Source:** `.gitlab-ci.yml` and Dockerfile inspection
+
+### 7.15 docker:dind Runs in Privileged Mode Without Hardening
+- **Problem:** Docker-in-Docker service runs without seccomp, AppArmor, or resource limits.
+- **Impact:** Container escape path to runner host / GitLab instance. Maps to **T2-12**.
+- **Source:** `.gitlab-ci.yml` inspection; CIS Docker Benchmark
+
+### 7.16 No Dockerfile Best-Practice Scanning
+- **Problem:** No Hadolint, Dockle, or equivalent validates Dockerfiles before build.
+- **Impact:** Running as root, missing `.dockerignore`, and other misconfigs persist in every image. Maps to **T2-12**.
+- **Source:** Pipeline inspection
+
+### 7.17 No K8s/Helm Manifest Security Validation
+- **Problem:** No Checkov, kube-score, or equivalent for Helm charts or K8s manifests.
+- **Impact:** Privileged containers, secrets in ConfigMaps, excessive RBAC deploy undetected. Maps to **T2-13**.
+- **Source:** Pipeline inspection; infrastructure documentation
+
+### 7.18 No Dynamic Application Security Testing (DAST)
+- **Problem:** No ZAP or equivalent runtime security validation against staging.
+- **Impact:** Missing headers, exposed endpoints, CORS misconfigs found only in RMT or by customers. Maps to **T4-6**.
+- **Source:** Pipeline inspection; OWASP Top 10 2021
+
+### 7.19 No Software Bill of Materials (SBOM)
+- **Problem:** No SBOM generated for any release.
+- **Impact:** CVE response measured in days not minutes. Enterprise customers and EU Cyber Resilience Act (2027) require SBOMs. Maps to **T4-1**.
+- **Source:** Pipeline inspection
+
+### 7.20 No Container Image Signing or SLSA Provenance
+- **Problem:** Images have no Cosign signature or build attestation.
+- **Impact:** Registry tampering undetectable at deploy time. Maps to **T4-7**.
+- **Source:** Pipeline inspection; SLSA framework
+
+### 7.21 Java Branch Build Is Manual, Bypassing Security Scans
+- **Problem:** Java `gitlab_build_branch` has `when: manual` — branch images never scanned unless manually triggered.
+- **Impact:** Hot-fix and ad-hoc branch deploys bypass all scanning. Maps to **T3-12**.
+- **Evidence:** Java `.gitlab-ci.yml`: `#Runs on every commit (manual)`.
+- **Source:** `.gitlab-ci.yml` inspection
+
+### 7.22 Code Format Job Disabled in Node Pipeline
+- **Problem:** `node-format-frontend` entirely commented out (custom image unavailable).
+- **Impact:** Formatting noise obscures security-relevant code in review. Maps to **T3-13**.
+- **Source:** Node `.gitlab-ci.yml` lines 75–93
+
+### 7.23 No Coverage Threshold at Test Runner Level
+- **Problem:** jest and Jacoco report coverage but enforce no minimum. Developer can delete all tests and pipeline passes.
+- **Impact:** Untested attack surfaces ship unchecked. SonarQube threshold bypassed via `allow_failure: true`. Maps to **T3-11**.
+- **Source:** `.gitlab-ci.yml`, `jest.config.js`, `pom.xml` inspection
 
 ---
 
@@ -320,11 +413,16 @@ The following sources have been identified but **not yet incorporated** into thi
 | Confluence child pages of CI/CD Objectives | ✅ Incorporated via `docs/cicd_objectives_gaps.md` | None — complete |
 | Confluence: [Release retro](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/505511940) | 🔴 Not yet fetched | Fetch if relevant |
 | Confluence: [Sessions with Awais on improving CI/CD](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/1636827164) | 🔴 Not yet fetched | Fetch if relevant |
+| Confluence: CI/CD Security Policy | 🔴 Not yet created | Create after Phase 1 implementation (T1-6) |
+| Confluence: Security Tooling Runbook | 🔴 Not yet created | Create after tool selection finalized |
+| Confluence: Dependency Vulnerability Response Playbook | 🔴 Not yet created | Create after OWASP DC + Trivy FS deployed |
+| `.gitlab-ci.yml` templates in `ci-templates` repo | ⚠️ Partially reviewed | Review `.trivy_scan_template`, `.grype_template` for hardening |
 
 ---
 
 ## Next Steps
 
 1. **Review for completeness:** Validate whether any additional problem areas exist or whether any items above need correction.
-2. **Prioritize:** Once validated, we can classify problems by urgency/impact to focus the solution design.
-3. **Proceed to solution design:** Move to TR (Technical Research) to evaluate improvement strategies.
+2. **Prioritize:** Classify problems by urgency/impact — see `priority-list-cicd-test-automation.md`.
+3. **Assign DRIs:** Security Lead (Zaryab) for policy/tooling; DevOps (Haroon) for CI integration; Stream Leads for language-specific items.
+4. **Begin Phase 1 implementation:** T1-6 — enable enforcing gates (`allow_failure: false`) and add TruffleHog.

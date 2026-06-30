@@ -15,6 +15,8 @@ Source: https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/2024210454/Ro
 - [ ] **GitLab CD POC** — In progress; demo expected week of 2026-06-02.
 - [x] **Umar** — Complete the automation testing cycle. Target: 70% coverage across chat use cases. ✓ Done.
 - [ ] **Umar** — Script improvements from 70% coverage work; due 2026-06-04.
+- [x] **Zaryab** — T1-6 security gate enforcement: approach finalized with team (2026-06-15). Pipeline implementation pending. See `priority-list-cicd-test-automation.md` T1-6.
+- [ ] **Zaryab** — Evaluate Renovate vs Dependabot for automated dependency security updates (2026-06-19, in progress). See `docs/cicd_objectives_gaps.md` Gap 3.
 
 ## June 1, 2026 Meeting Points
 
@@ -34,6 +36,12 @@ Source: https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/2024210454/Ro
   - Automate the scanning and fixing — security hotfix
   - Related: [VAPT page 1](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/1238893777), [VAPT page 2](https://expertflow-docs.atlassian.net/wiki/spaces/EF/pages/1941504045), [VAPT page 3](https://expertflow-docs.atlassian.net/wiki/x/AwD8cw), [VAPT page 4](https://expertflow-docs.atlassian.net/wiki/spaces/~55705835b89813bf8740fc84ac066dff1360ed/pages/1340506148)
 - **Feature flag framework** finalization
+
+## June 2026 — Security & Supply Chain (Zaryab / team alignment)
+
+- **Security quality gates in Definition of Done** — Release-Ready DoD should include blocking Trivy, Grype, and SonarQube passes. DoD location reviewed (`priority-list` T1-1, `docs/How_We_Work.md`); enforcement still via self-report today.
+- **T1-6 — Security scan enforcement** — Team agreed on phased rollout (`allow_failure: false` after CVE triage). Governance options documented in `security-audit/T1-6b-ci-cd-pipeline-governance-hardening-plan.md`.
+- **Multi-layer packaging & centralized hardened dependency images** — **R&D complete; not continued.** Security Lead evaluated a platform where developers borrow Security-maintained hardened dependencies across all GitLab repos (Node, Java, Python). Team decision: too operationally complex (parallel feature branches, develop sync risk, regression attribution). **Alternative path:** blocking CI scans (T1-6, T2-10) + Renovate/Dependabot MRs to **develop** (Gap 3) + multi-stage Dockerfiles (build heavy / runtime light via T2-12). Details: `docs/cicd_objectives_gaps.md` Gap 9.
 
 ## Related Documents
 
