@@ -66,6 +66,7 @@ This is a **new standalone initiative** (not a substitute for T1-1) that complet
 |------|--------|-------|-------|
 | **T1-1** DoD Enforcement | ⏸️ **Paused** | Haroon + stream tech leads | ScriptRunner rejected; revisit after T1-1b stable |
 | **T1-1b** Playwright Regression | ✅ **CI-ready** | Umar Ikhlaq + Haroon | All 10 suites pass in CI (4.7 min). Ready for cim-solution integration. |
+| **CRM-765** Playwright in cim-solution | 🔄 **In Progress** | Haroon | Integrate regression as manual-trigger job in cim-solution `.gitlab-ci.yml`.
 | **T1-2** Multi-Path Upgrade | 🔄 In Progress | Haroon (CRM-706) | Check Masood's progress only |
 | **T1-3** Data Rollback | ⏳ Queued | Nabeel | Last in Nabeel's stack |
 | **T1-4** RC Build Notification | 🔄 In Progress | Haroon / RMT | Slack webhook wiring |
