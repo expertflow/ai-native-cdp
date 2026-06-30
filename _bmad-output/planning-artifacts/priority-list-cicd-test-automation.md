@@ -14,7 +14,11 @@ Two goals run through all tiers:
 1. **Increase release velocity and predictability** — reduce the time and uncertainty between a feature being "dev complete" and it being in production.
 2. **Reduce cognitive load on stream-aligned teams** — teams should be able to build and ship with confidence, without needing tribal knowledge, manual coordination, or waiting on other humans to unblock them.
 
-These themes are not in conflict. Most of the high-priority items serve both simultaneously.
+A third goal from the June 2026 security audit:
+
+3. **Security is not optional** — every pipeline stage that scans for vulnerabilities must either pass or block. A green pipeline with failing security scans is a false promise.
+
+These themes are not in conflict. Most of the high-priority items serve all three simultaneously.
 
 ---
 
@@ -33,8 +37,11 @@ These are root causes or active risks that, if left unaddressed, prevent meaning
 
 **What good looks like:**
 - DoD criteria are objective and automatable (CI green, upgrade script present, deployment guide validated, no open blockers in Jira)
+- **Security quality gates are explicit DoD criteria:** Trivy/Grype/SonarQube pass with blocking enforcement (T1-6); no open CRITICAL/HIGH CVE without Security Lead exception; dependency lockfiles committed
 - The pipeline blocks an MR or a release-ready tag without those criteria being met
 - Tech leads validate intent; the pipeline validates fact
+
+**Note (2026-06-19):** Security gate criteria recommended; pending Haroon + tech leads implementation.
 
 **Cognitive load angle:** A clear, enforced DoD removes ambiguity for developers. They know exactly when they're done. No more "are we ready?" conversations — the system answers.
 
@@ -216,6 +223,35 @@ Once CRM-763 is complete, the next step is: stream-aligned team environments are
 
 ---
 
+### T1-6 · Security Scans Are Decorative — `allow_failure: true` on Every Gate
+**Cluster:** F1, F2, F3, F5 (security audit finding)  
+**Jira:** *To be created — "Enforce Security Scans in CI/CD"*  
+**Status (2026-06-19):** **Approach finalized** — team discussion complete; 4-week rollout plan agreed. Pipeline implementation pending. Governance options: `security-audit/T1-6b-ci-cd-pipeline-governance-hardening-plan.md`
+
+**Problem:** Every vulnerability scanner in both Node.js and Java pipelines — Trivy (branch + merge), Grype (branch + merge), and SonarQube (frontend + backend) — runs with `allow_failure: true`. A CRITICAL CVE produces a red report that no one reads, and the image is still pushed to the registry and deployed. The SonarQube quality gate has two instances (local lab at 80%, live at 90%) with no clear ownership, and neither blocks the pipeline because `allow_failure: true` overrides it. This is the single highest-leverage security intervention in the entire pipeline.
+
+**Why it's Tier 1:** Security scans provide a false sense of safety. The pipeline shows green while untested, vulnerable code reaches production. This undermines every other security control — Trivy, Grype, SonarQube, and any future scanners — because none of them can actually stop a bad build. It is also the prerequisite for *every* other security item: there is no point adding Checkov, TruffleHog, or OWASP ZAP if they too will be allowed to fail.
+
+**What good looks like:**
+- `allow_failure: false` on all security scan jobs: Trivy, Grype, SonarQube (both instances), and any future scanners
+- A graduated enforcement policy: CRITICAL and HIGH CVEs block immediately; MEDIUM and LOW are warnings with a 30-day remediation SLA
+- SonarQube instance consolidation: one canonical instance with 90% threshold, or explicit rules on when each applies
+- A documented exception process: if a CVE has no fix and risk is accepted, the exception is recorded in Jira with Security Lead approval
+
+**Risk of implementation:** Changing `allow_failure: true` → `false` will break existing pipelines until current CVEs are triaged and remediated. This must be done in a controlled rollout:
+1. **Week 1:** Audit current scan results and create a CVE backlog (Trivy + Grype + SonarQube)
+2. **Week 2:** Fix or triage all CRITICAL and HIGH findings (estimated 20-40 items based on current Trivy output)
+3. **Week 3:** Enable `allow_failure: false` on all scan jobs
+4. **Week 4:** Monitor and adjust thresholds
+
+**Cognitive load angle:** Developers need to know that when CI is green, the build is genuinely safe — not just "scanned but ignored." This removes the ambiguity of "should I care about this Trivy report?"
+
+**DRI:** Zaryab Baloch (Security Lead/PO) + Haroon (DevOps)  
+**Effort:** Low (configuration change) — Medium (CVE triage and remediation)  
+**Prerequisite for:** T2-4, T2-7, T2-10, T2-11, T2-12, T2-13, T3-11, T3-12, T3-13, T4-1, T4-6, T4-7
+
+---
+
 ## 🟠 Tier 2 — High Urgency (Next 1–2 Quarters)
 
 These have significant compounding cost if delayed but are not immediately blocking releases today.
@@ -281,12 +317,19 @@ These have significant compounding cost if delayed but are not immediately block
 ### T2-4 · Vulnerability Management for Supported Releases
 **Cluster:** F4
 
-**Problem:** Trivy scans run for the current release in flight. Customers on older supported versions (e.g. CX5.0.x while CX5.1 is current) have no security posture visibility. No support window definition exists. No SLA for CVE fixes in older releases. Abdul Moeed's action item is open.
+**Problem:** Trivy scans run for the current release in flight. Customers on older supported versions (e.g. CX5.0.x while CX5.1 is current) have no security posture visibility. No support window definition exists. No SLA for CVE fixes in older releases. Zaryab Baloch's action item is open.
 
 **Why it's Tier 2:** Customer trust issue with enterprise clients. Sales blocker for regulated industries. No immediate incident today, but the exposure grows with each release.
 
-**DRI suggestion:** Abdul Moeed + RMT  
-**Effort:** Medium — scheduled pipeline + support window policy decision
+**What good looks like:**
+- A defined support window: e.g., N and N-1 are supported; N-2 receives critical CVE patches only
+- Scheduled Trivy scans for every supported release branch, published to a security dashboard
+- An SLA for CVE remediation: CRITICAL ≤ 7 days, HIGH ≤ 30 days, MEDIUM ≤ 90 days
+- Enterprise customers (FNB, Cisco) can request an SBOM and current vulnerability report on demand
+
+**DRI suggestion:** Zaryab Baloch + RMT  
+**Effort:** Medium — scheduled pipeline + support window policy decision  
+**Depends on:** T1-6 (enforcing scans)
 
 ---
 
@@ -326,17 +369,20 @@ These have significant compounding cost if delayed but are not immediately block
 ### T2-7 · VAPT and Security Scanning Automation
 **Cluster:** F1, F3, F5
 
-**Problem:** VAPT is not automated or scheduled. OWASP, Burp Suite, and Nmap scans are manual at release time. Automated dependency updates (Renovate or equivalent) are not implemented — Trivy alert volume is inflated by fixable dependency debt.
+**Problem:** VAPT is not automated or scheduled. OWASP, Burp Suite, and Nmap scans are manual at release time. Automated dependency updates (Renovate or equivalent) are not implemented — Trivy alert volume is inflated by fixable dependency debt. The security scan ecosystem is fragmented: Trivy and Grype do the same job, secret scanning is absent, and build-time dependency checks are missing.
 
-**Why it's Tier 2:** Security feedback is currently end-of-cycle. Earlier detection is cheaper. Automated dependency updates directly reduce Trivy noise.
+**Why it's Tier 2:** Security feedback is currently end-of-cycle. Earlier detection is cheaper. Automated dependency updates directly reduce Trivy noise. The audit found 6 gaps beyond what EF's plan addressed: Trivy FS scanning, Checkov IaC scanning, SBOM generation, image signing, DAST, and SLSA provenance.
 
 **Phased approach:**
-1. Decide Renovate vs Snyk and implement automated dependency update MRs (reduces Trivy alert volume immediately)
-2. Schedule Trivy across supported releases (addresses T2-4 overlap)
-3. Automate VAPT cadence — schedule and publish reports
+1. **Phase 2A (Weeks 2–3):** TruffleHog secret scanning, `npm audit` + OWASP Dependency-Check build-time scanning, Dockerfile scanning (Hadolint/Dockle), IaC scanning (Checkov), eliminate redundant Grype
+2. **Phase 2B (Weeks 4–6):** Semgrep SAST (Node + Java), SpotBugs/FindSecBugs (Java), docker:dind hardening with seccomp, base image SHA pinning, Syft SBOM generation, detect-secrets pre-commit hook
+3. **Phase 2C (Weeks 7–8):** Renovate/Dependabot automated dependency update MRs to **develop** (see `docs/cicd_objectives_gaps.md` Gap 3), VAPT scheduling and reporting
 
-**DRI suggestion:** DevOps / RMT  
-**Effort:** Medium
+**Status (2026-06-19):** Multi-layer hardened dependency platform R&D **not continued** (Gap 9). Zaryab evaluating **Renovate vs Dependabot** for Phase 2C — PoC on one Node + one Java repo. Bot MR author owns regression fixes when develop CI fails.
+
+**DRI suggestion:** Zaryab Baloch (Security Lead/PO) + Haroon (DevOps) + stream leads  
+**Effort:** Medium  
+**Depends on:** T1-6 (enforcing scans)
 
 ---
 
@@ -387,6 +433,85 @@ These have significant compounding cost if delayed but are not immediately block
 
 ---
 
+### T2-10 · Build-Time Dependency Scanning (npm audit + OWASP Dependency-Check)
+**Cluster:** F3 (security audit finding)
+
+**Problem:** `npm audit` never runs in the Node.js pipeline. The `node_artifacts_frontend` job uses `npm install --legacy-peer-deps`, which suppresses npm v7+ dependency conflict resolution. A vulnerable transitive dependency can slip in without any warning. The Java pipeline has no OWASP Dependency-Check or equivalent. Container scanning (Trivy/Grype) only sees the final image — dev dependencies and build tools are invisible.
+
+**Why it's Tier 2:** Build-time scanning catches vulnerabilities in dependencies that never make it into the container image (webpack, babel, test frameworks, build plugins). These are attack surfaces for supply chain compromise. OWASP Dependency-Check is the industry standard for Java; `npm audit` is built into npm and costs nothing to run.
+
+**What good looks like:**
+- `npm audit` runs in every Node.js build, fails on CRITICAL and HIGH findings (configurable)
+- OWASP Dependency-Check Maven plugin runs in every Java build, fails on CVSS ≥ 7.0
+- Both tools are configured with `allow_failure: false` (enforced by T1-6)
+- Suppression files are maintained for known false positives, reviewed quarterly
+
+**DRI suggestion:** Node lead + Java lead + Haroon (DevOps)  
+**Effort:** Low — plugin configuration per pipeline  
+**Depends on:** T1-6 (enforcing scans)
+
+---
+
+### T2-11 · Secret Scanning (TruffleHog) and Pre-Commit Prevention
+**Cluster:** F1, F2 (security audit finding)
+
+**Problem:** Neither pipeline runs any secret detection. CI variables like `SONAR_PASS`, `SONAR_PASS_LIVE`, and `CI_PIPELINE_IID_TOKEN` are referenced in YAML. If any developer accidentally hardcodes these values, they would be committed and pushed with zero detection. No pre-commit hooks exist to catch secrets before they reach CI.
+
+**Why it's Tier 2:** Committed secrets are the #1 cause of cloud breaches. TruffleHog scans the full Git history (including MRs) for secrets. A pre-commit hook (detect-secrets) stops secrets at the developer's machine before they reach Git. The combination provides defense in depth.
+
+**What good looks like:**
+- TruffleHog runs on every MR, scanning the entire branch history (not just the diff), with `allow_failure: false`
+- detect-secrets pre-commit hook is installed repo-wide via `.pre-commit-config.yaml`
+- A secrets response playbook exists: rotation procedure, incident notification, forensics steps
+- Quarterly secret scan audits of the full repository history
+
+**DRI suggestion:** Zaryab Baloch (Security Lead/PO) + Haroon (DevOps)  
+**Effort:** Low — TruffleHog is a single CI job; pre-commit hook is repo configuration  
+**Depends on:** T1-6 (enforcing scans)
+
+---
+
+### T2-12 · Dockerfile and Container Security Scanning
+**Cluster:** F5 (security audit finding)
+
+**Problem:** No tool validates Dockerfiles for security misconfigurations before build. Common issues like running as root, missing `.dockerignore`, using `ADD` instead of `COPY`, or missing `HEALTHCHECK` go undetected. Docker base images use mutable tags instead of SHA digests. `docker:dind` runs in privileged mode without seccomp or AppArmor profiles. Runtime images often include build tooling that should live only in a build stage.
+
+**R&D note (2026-06-18):** Multi-layer packaging with Security-maintained hardened application dependency images was explored and **not continued** (`docs/cicd_objectives_gaps.md` Gap 9). **Retained:** multi-stage Dockerfile standard — build stage (heavy) copies artifacts into runtime stage (lightweight); OS/runtime base SHA pinning only, not Security-cached app deps.
+
+**Why it's Tier 2:** Misconfigured Dockerfiles are direct attack vectors. A `USER root` directive or an overly permissive `chmod` introduces vulnerabilities in every image. SHA digest pinning prevents tag-tampering attacks. docker:dind hardening prevents container escape.
+
+**What good looks like:**
+- Hadolint or Dockle runs on every Dockerfile change, fails on HIGH severity issues
+- All `FROM` statements pin to SHA digest (not tag): `FROM node:18.14.1-alpine3.17@sha256:...`
+- Multi-stage builds: build tools in builder stage; runtime image contains app artifacts only
+- `docker:dind` service uses `security_opt` with custom seccomp profile and resource limits
+- `USER` directive is present in every Dockerfile; no image runs as root by default
+
+**DRI suggestion:** Haroon (DevOps) + stream leads  
+**Effort:** Low–Medium — Dockerfile updates + CI job configuration  
+**Depends on:** T1-6 (enforcing scans)
+
+---
+
+### T2-13 · Infrastructure-as-Code Security Scanning (Checkov)
+**Cluster:** F5 (security audit finding)
+
+**Problem:** Expertflow deploys to Kubernetes via Helm charts, but no security scanning exists for K8s manifests, Helm charts, or Terraform. Misconfigurations like privileged containers, missing resource limits, secrets in ConfigMaps, or excessive RBAC permissions go undetected.
+
+**Why it's Tier 2:** A misconfigured Helm chart can deploy a container with `privileged: true`, mount the host filesystem, or expose a service without network policies. These are deployment-time vulnerabilities invisible to code scanning. Checkov is the industry standard for IaC security.
+
+**What good looks like:**
+- Checkov runs on every Helm chart and Terraform change, fails on CRITICAL and HIGH findings
+- A custom Checkov policy baseline is defined for Expertflow's K8s environment
+- Suppression file maintained for known false positives, reviewed quarterly
+- Results published to a security dashboard alongside Trivy and SonarQube
+
+**DRI suggestion:** Haroon (DevOps) + Zaryab Baloch (Security Lead/PO)  
+**Effort:** Low–Medium — tool configuration + policy baseline definition  
+**Depends on:** T1-6 (enforcing scans)
+
+---
+
 ## 🟡 Tier 3 — Plan This Quarter (Meaningful ROI, Not Immediately Blocking)
 
 | # | Challenge | Why Tier 3 | DRI |
@@ -401,6 +526,54 @@ These have significant compounding cost if delayed but are not immediately block
 | T3-8 | Teams outside Core brought to same dev/code-review standards | Integration surprises traced to non-Core teams not following same practices | Haroon + stream leads |
 | T3-9 | Formal rollback procedure documented | Currently ad-hoc via Google Chat; tribal knowledge | RMT |
 | T3-10 | Hotfix and dual-codebase patch process formalized | Two related gaps: (1) hotfix must be release-ready for the latest production release; (2) stream-aligned teams are not consistently applying hotfix changes back to the latest develop branch — a gate is needed to enforce this. Reactive and unplanned today; needs a trigger protocol, gate, and effort accounting | Jawad + Haroon + POs |
+| T3-11 | **Test runner coverage thresholds enforced (jest + Jacoco)** | SonarQube enforces 80%/90% but is bypassed by `allow_failure: true`. Test runner thresholds are the tripwire that catches coverage drops at build time. Without them, a developer can delete all tests and the pipeline passes. | Node lead + Java lead |
+| T3-12 | **Java branch build auto-triggered (`when: manual` removed)** | Java `gitlab_build_branch` uses `when: manual`, meaning branch images are never scanned unless manually triggered. Creates a security bypass for hot-fixes and ad-hoc deploys. | Java lead + Haroon |
+| T3-13 | **Code format job re-enabled in Node pipeline** | `node-format-frontend` is entirely commented out. Inconsistent formatting increases cognitive load during code review and makes security-relevant code harder to spot. | Node lead |
+
+### T3-11 · Test Runner Coverage Thresholds (jest + Jacoco)
+**Cluster:** D1, D2 (security audit finding)
+
+**Problem:** `npm run coverage --u` and `mvn verify` run tests with coverage reporting but no minimum threshold. A developer can delete all tests and the pipeline still passes. SonarQube has 80%/90% thresholds but is unenforced due to `allow_failure: true`.
+
+**What good looks like:**
+- jest `coverageThreshold` set to 70% global minimum (aligns with current SonarQube baseline)
+- Jacoco `minimum` configured in `pom.xml` for line and branch coverage
+- Both thresholds enforced with `allow_failure: false` (via T1-6)
+- Thresholds increase incrementally: 70% → 75% → 80% per quarter
+
+**DRI suggestion:** Node lead + Java lead  
+**Effort:** Low  
+**Depends on:** T1-6 (enforcing scans)
+
+---
+
+### T3-12 · Java Branch Build Auto-Triggered (`when: manual` Removed)
+**Cluster:** F3 (security audit finding)
+
+**Problem:** The Java pipeline's `gitlab_build_branch` job has `when: manual`. Branch builds never trigger Trivy/Grype scans unless manually clicked.
+
+**What good looks like:**
+- `when: manual` removed from `gitlab_build_branch`; branch builds auto-trigger on push
+- Branch scans use the same `allow_failure: false` policy as merge scans (via T1-6)
+
+**DRI suggestion:** Java lead + Haroon  
+**Effort:** Low  
+**Depends on:** T1-6 (enforcing scans)
+
+---
+
+### T3-13 · Code Format Job Re-Enabled in Node Pipeline
+**Cluster:** H2 (security audit finding)
+
+**Problem:** The `node-format-frontend` job is entirely commented out (custom image unavailable).
+
+**What good looks like:**
+- Format job re-enabled using a standard Node image
+- Prettier or ESLint `fix` runs in CI, fails on unformatted code
+
+**DRI suggestion:** Node lead  
+**Effort:** Low  
+**Depends on:** None
 
 ---
 
@@ -410,10 +583,13 @@ These are real and worth tracking, but they depend on Tier 1–2 progress or req
 
 | # | Challenge | Dependency / Blocker |
 |---|-----------|----------------------|
+| T4-1 | **SBOM generation (Syft/CycloneDX) per release** | T1-6 + T2-7. Required for enterprise customer trust and EU Cyber Resilience Act compliance (2027). |
 | T4-2 | WCAG accessibility compliance (Customer Widget + Agent Desk) | Customer ask growing; no owner or target level defined yet |
 | T4-3 | Continuous Deployment — business feedback loop | Requires a "friendly customer" programme and feedback mechanism design |
 | T4-4 | Customer-facing support lifecycle policy | FNB/Andreas request; needs product and management alignment |
 | T4-5 | Cisco deployment ownership and reliability | Low frequency; needs an owner assigned, then a process |
+| T4-6 | **DAST (OWASP ZAP) against staging on every release** | T1-6 + T2-7. Runtime security validation SAST cannot catch. |
+| T4-7 | **Container image signing (Cosign) and SLSA Level 1 provenance** | T1-6 + T2-7. Prevents registry tampering and supply chain attacks. |
 
 ---
 
@@ -421,10 +597,22 @@ These are real and worth tracking, but they depend on Tier 1–2 progress or req
 
 | Tier | Count | Defining characteristic |
 |------|-------|------------------------|
-| 🔴 Tier 1 | 5 | Root causes and active risks; fix first |
-| 🟠 Tier 2 | 9 | High compounding cost; next 1–2 quarters |
-| 🟡 Tier 3 | 10 | Real value; plan this quarter, sequence carefully |
-| ⚪ Tier 4 | 4 | Strategic horizon; track but don't act yet |
+| 🔴 Tier 1 | 6 | Root causes and active risks; fix first |
+| 🟠 Tier 2 | 13 | High compounding cost; next 1–2 quarters |
+| 🟡 Tier 3 | 13 | Real value; plan this quarter, sequence carefully |
+| ⚪ Tier 4 | 7 | Strategic horizon; track but don't act yet |
+
+---
+
+## Security Items by Phase
+
+Maps to `security-audit/ci-cd-security-plan-consolidated.md`:
+
+| Phase | Timeline | Security Items | Target Score |
+|-------|----------|----------------|--------------|
+| **Phase 1: Stop the Bleeding** | Week 1 | T1-6 (enforce scans), T2-11 (TruffleHog), T2-10 (npm audit + OWASP DC), T3-12 (Java auto-build), T3-13 (format job) | 19 → 55 |
+| **Phase 2: Baseline Security** | Weeks 2–3 | T2-7 (VAPT automation), T2-12 (Dockerfile scanning), T2-13 (Checkov), T3-11 (coverage thresholds), T2-4 (supported release scanning) | 55 → 78 |
+| **Phase 3: Supply Chain & Runtime** | Months 2–3 | T4-1 (SBOM), T4-6 (DAST/ZAP), T4-7 (Cosign signing + SLSA); T2-7 Phase 2C (Renovate/Dependabot) | 78 → 91 |
 
 ---
 
@@ -436,8 +624,42 @@ The following items have the highest direct impact on stream-aligned team fricti
 |------|----------------------------------|
 | T1-1 (DoD enforcement) | "Am I done?" becomes an objective answer, not a negotiation |
 | T1-4 (pre-release announcement) | "What do I build against?" has one clear answer, always |
+| T1-6 (security scan enforcement) | "Is this build safe?" is answered by the pipeline, not by hoping someone read the Trivy report |
 | T2-2 (deployment guides validated) | Teams own their guide; RMT stops being the place where gaps are discovered |
 | T2-5 (target lock) | "Will my target change?" is bounded by a known protocol |
+| T2-11 (secret scanning) | "Did I accidentally commit a secret?" is caught before push, not after deployment |
 | T3-4 (IaC pre-release self-serve) | Teams can spin up their own env without waiting for RMT |
 | T3-2 (feature flags) | Teams can merge incomplete work safely; no "is this ready to ship?" gate on merge |
 | T3-7 (TBD adoption) | One branching model across all teams; no context switching |
+| T3-13 (format enforcement) | Code review focuses on logic, not formatting; security-relevant code is easier to spot |
+
+---
+
+## DRI Quick Reference
+
+| Person | Items | Role |
+|--------|-------|------|
+| **Zaryab Baloch** | T1-6, T2-4, T2-7, T2-11, T4-1, T4-6, T4-7 | Security Lead / Product Owner |
+| Haroon | T1-1, T1-4, T1-5, T2-1, T2-6, T2-7, T2-12, T2-13, T3-4, T3-8, T3-10, T4-1, T4-7 | RMT / DevOps |
+| Nabeel | T1-3, T2-3 | Stream lead |
+| Umar Naveed | T1-5, T2-6 | CD pipeline / QA |
+| Jawad | T2-5, T2-8, T3-5, T3-10 | Program management |
+| Umar Ikhlaq | T3-1 | Head of QA |
+| Awais | T3-2, T3-7 | DevOps / TBD |
+| Node lead | T2-10, T3-11, T3-13 | Node.js stream |
+| Java lead | T2-10, T3-11, T3-12 | Java stream |
+| Stream tech leads | T1-1, T2-1, T2-2, T3-3, T3-6, T3-8 | Per component |
+
+---
+
+## Notes for Discussion with Haroon / Nabeel / Jawad
+
+1. **T1-6 is the security anchor.** Every other security item depends on it. Without `allow_failure: false`, adding TruffleHog, Checkov, or ZAP is theater. The rollout plan (4 weeks, with CVE triage first) is designed to minimize pipeline breakage.
+
+2. **T2-4 and T2-7 DRI:** Zaryab Baloch (Security Lead) — updated from earlier Abdul Moeed assignment.
+
+3. **Security audit added 7 Tier 2 items, 3 Tier 3 items, and 3 Tier 4 items** (T1-6, T2-10–13, T3-11–13, T4-1/6/7). Total list: 39 items.
+
+4. **Multi-layer / hardened dep platform (2026-06-19):** R&D complete — **not continued.** See `docs/cicd_objectives_gaps.md` Gap 9. Alternative: T2-7 Phase 2C (Renovate/Dependabot) + T2-12 multi-stage Dockerfiles.
+
+5. **Phase 1 exit criteria:** `allow_failure: false` on all security jobs, TruffleHog, `npm audit`, OWASP Dependency-Check, Java auto-build, format job re-enabled. Estimated timeline: 1 week.
