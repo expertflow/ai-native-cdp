@@ -3,7 +3,7 @@
 > **Status:** Active — Working Backlog (Round 2 — updated June 2026)
 > **Produced by:** Problem Inventory analysis + stakeholder corrections (June 2026)
 > **Sources:** `problem-inventory-cicd-test-automation.md`, `docs/cicd_objectives_gaps.md`, `team_input/Road to CD.md`, Confluence retro pages, direct stakeholder input (Haroon — RMT, Junaid — RMT)
-> **Last updated:** 2026-06-30
+> **Last updated:** 2026-07-01
 
 ---
 
@@ -116,6 +116,11 @@ Confirmed directly in `cim-solution/.gitlab-ci.yml`: `notify-google-chat` runs `
 
 **Status:** ✅ **Integrated & verified in cim-solution** (CRM-765 Resolved) — `regression-test` + `notify-google-chat` both live. Still manual-trigger pending CRM-763 (T1-5) auto-deploy; will switch to automatic once that lands.
 
+**Follow-on items (July 1, 2026 session):**
+- **[CRM-768](https://expertflow-docs.atlassian.net/browse/CRM-768)** — Playwright suite versioning: tag `playwright-automation-script` at each CX release cut (`v5.4.0`, `v5.5.0`, …); rename `PLAYWRIGHT_BRANCH` → `PLAYWRIGHT_REF` in cim-solution CI. DRI: Umar Ikhlaq.
+- **[CRM-767](https://expertflow-docs.atlassian.net/browse/CRM-767)** — NodeRED blocker: unblock NodeRED-dependent Playwright tests via Admin API flow fixtures (`POST /flows` in `beforeAll`; restore in `afterAll`). DRI: Umar Ikhlaq.
+- **[CRM-769](https://expertflow-docs.atlassian.net/browse/CRM-769)** — Rollback job: add `rollback-on-failure` stage (reads JUnit artifact; `helm rollback` on failure). Phase 1 now (allow_failure workaround); Phase 2 when CD is live. DRI: Haroon.
+
 ---
 
 ### T1-2 · Multi-Path Upgrade Not Supported
@@ -216,7 +221,11 @@ Once CRM-763 is complete, the next step is: stream-aligned team environments are
 **Next actions:**
 - Complete POC and document the native GitLab agent deployment model
 - Align with T1-4 so the notification fires automatically from the CD pipeline post-deployment
-- Define rollback procedure for failed incremental upgrades
+- Define rollback procedure for failed incremental upgrades (tracked in CRM-769)
+
+**Follow-on items scoped July 1, 2026 (must complete after CRM-763 base CD is stable):**
+- **[CRM-771](https://expertflow-docs.atlassian.net/browse/CRM-771)** — CD pre-deploy resources: automate ConfigMaps (with `envsubst` templating — hardcoded hostnames are a critical gap), TLS secrets, ImagePullSecrets, Vault/CSI RBAC. `pre-deploy` stage runs before Helm deploy. DRI: Umar Naveed.
+- **[CRM-772](https://expertflow-docs.atlassian.net/browse/CRM-772)** — CD post-deploy tasks: automate tenant creation, Grafana dashboards, Metabase/Superset reports, MinIO bucket data, webhooks, compliance data. `post-deploy` stage runs after Helm deploy. DRI: Umar Naveed.
 
 **DRI:** Umar Naveed  
 **Effort:** Medium — POC in progress; full workflow implementation follows
@@ -305,11 +314,15 @@ These have significant compounding cost if delayed but are not immediately block
 
 **Why it's Tier 2 (not Tier 1):** The 70% regression automation already catches some of what integration tests would catch at the later stage. However, the retro evidence is clear that the class of defects escaping to RMT — Keycloak permission mismatches, async behavior issues, cross-component interference — is exactly what integration tests are designed to prevent.
 
-**Recommended first step:** Nabeel produces the integration testing guide. This is a scoping exercise (which service boundaries are highest risk? what tooling fits — Testcontainers, Pact, Supertest?) before any implementation commitment.
+**Scope decision (July 1, 2026):** Integration tests belong at the **microservice CI pipeline level only** — providing an early feedback gate per service after unit tests and before image build. A separate integration test stage in cim-solution or the skeleton pipeline is **out of scope** — the Playwright regression cycle already covers end-to-end validation after deployment.
+
+**Jira:** [CRM-770](https://expertflow-docs.atlassian.net/browse/CRM-770) — Assigned: Nabeel Ahmad · Status: Discovery
+
+**First step:** Nabeel produces the guide (scoping exercise — which service boundaries, what tooling, estimated effort per service). Implementation stories created from the guide output.
 
 **Sequencing note:** Nabeel's 3rd priority after OM version management (T1-6) and Reporting/Data Platform packaging (T2-9).
 
-**DRI suggestion:** Nabeel Ahmad  
+**DRI:** Nabeel Ahmad  
 **Effort:** Low to start (guide) — Medium to implement
 
 ---
@@ -516,7 +529,7 @@ These have significant compounding cost if delayed but are not immediately block
 
 | # | Challenge | Why Tier 3 | DRI |
 |---|-----------|------------|-----|
-| T3-1 | Regression coverage lift from 70% to 85%+ | 70% milestone demonstrated June 4 2026 (Playwright — Umar Ikhlaq). Next: define objectives and milestones for path to 85%+ | Umar Ikhlaq (Head of QA) |
+| T3-1 | Regression coverage lift from 70% to 85%+ | 70% milestone was against CX-Chat-Cases only — not the full CX test inventory. **First step (July 1, 2026):** [CRM-766](https://expertflow-docs.atlassian.net/browse/CRM-766) — organise full CX test cases in Jira TM, re-baseline coverage %, produce ETA per domain. NodeRED blocker addressed in [CRM-767](https://expertflow-docs.atlassian.net/browse/CRM-767). Suite versioning in [CRM-768](https://expertflow-docs.atlassian.net/browse/CRM-768). | Umar Ikhlaq (Head of QA) |
 | T3-2 | Feature flag framework production-ready | Enables TBD and safe merging of incomplete work; needs TBD adoption enforced first | Awais / DevOps |
 | T3-3 | Release versioning policy enforcement | Process discipline before tooling; quick governance fix | Haroon + stream leads |
 | T3-4 | IaC for pre-release versions (stream self-serve) | Reduces dependency on RMT for env setup; high cognitive load reduction | RMT |
