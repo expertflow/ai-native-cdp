@@ -1,0 +1,507 @@
+<title>The Complete Release Pipeline</title>
+<style>
+  :root {
+    --bg: #f3f4f2;
+    --surface: #ffffff;
+    --surface-inset: #eceeec;
+    --border: #d7dad6;
+    --text: #1b1f1d;
+    --text-dim: #5b625d;
+    --text-faint: #8a908b;
+
+    --lane-build: #4c6f95;
+    --lane-build-soft: #4c6f9514;
+    --lane-deploy: #7d5f9e;
+    --lane-deploy-soft: #7d5f9e14;
+    --lane-test: #4f8577;
+    --lane-test-soft: #4f857714;
+
+    --status-pass: #2f9e5b;
+    --status-pass-soft: #2f9e5b1a;
+    --status-fail: #c94a3c;
+    --status-fail-soft: #c94a3c1a;
+    --accent: #c98a2e;
+    --accent-soft: #c98a2e1a;
+
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Consolas", "Liberation Mono", monospace;
+    --sans: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --surface: #1b1e23;
+      --surface-inset: #23262c;
+      --border: #33373e;
+      --text: #eceef0;
+      --text-dim: #a3a9b0;
+      --text-faint: #6b7178;
+
+      --lane-build: #7ea3d6;
+      --lane-build-soft: #7ea3d61f;
+      --lane-deploy: #b696dd;
+      --lane-deploy-soft: #b696dd1f;
+      --lane-test: #7fbba9;
+      --lane-test-soft: #7fbba91f;
+
+      --status-pass: #4fc27e;
+      --status-pass-soft: #4fc27e22;
+      --status-fail: #e5786a;
+      --status-fail-soft: #e5786a22;
+      --accent: #e0a94e;
+      --accent-soft: #e0a94e22;
+
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #14161a;
+    --surface: #1b1e23;
+    --surface-inset: #23262c;
+    --border: #33373e;
+    --text: #eceef0;
+    --text-dim: #a3a9b0;
+    --text-faint: #6b7178;
+    --lane-build: #7ea3d6;
+    --lane-build-soft: #7ea3d61f;
+    --lane-deploy: #b696dd;
+    --lane-deploy-soft: #b696dd1f;
+    --lane-test: #7fbba9;
+    --lane-test-soft: #7fbba91f;
+    --status-pass: #4fc27e;
+    --status-pass-soft: #4fc27e22;
+    --status-fail: #e5786a;
+    --status-fail-soft: #e5786a22;
+    --accent: #e0a94e;
+    --accent-soft: #e0a94e22;
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f3f4f2;
+    --surface: #ffffff;
+    --surface-inset: #eceeec;
+    --border: #d7dad6;
+    --text: #1b1f1d;
+    --text-dim: #5b625d;
+    --text-faint: #8a908b;
+    --lane-build: #4c6f95;
+    --lane-build-soft: #4c6f9514;
+    --lane-deploy: #7d5f9e;
+    --lane-deploy-soft: #7d5f9e14;
+    --lane-test: #4f8577;
+    --lane-test-soft: #4f857714;
+    --status-pass: #2f9e5b;
+    --status-pass-soft: #2f9e5b1a;
+    --status-fail: #c94a3c;
+    --status-fail-soft: #c94a3c1a;
+    --accent: #c98a2e;
+    --accent-soft: #c98a2e1a;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .page {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 48px 24px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+  }
+
+  header.top { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+  h1 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin: 0;
+    font-weight: 650;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .lede {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .lede code { font-family: var(--mono); font-size: 0.92em; color: var(--text); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .dot.build { background: var(--lane-build); }
+  .dot.deploy { background: var(--lane-deploy); }
+  .dot.test { background: var(--lane-test); }
+  .dot.pass { background: var(--status-pass); }
+  .dot.fail { background: var(--status-fail); }
+  .dot.action { background: var(--accent); }
+
+  /* ---- Lane sections ---- */
+  .lane {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 24px 26px;
+  }
+  .lane-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0 0 20px;
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .lane-header .repo-name { color: var(--lane-color); }
+  .lane-header .lane-sub {
+    font-family: var(--sans);
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--text-faint);
+  }
+
+  .stage-list {
+    list-style: none;
+    margin: 0;
+    padding-left: 26px;
+    border-left: 2px solid var(--lane-color);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .stage { position: relative; }
+  .stage::before {
+    content: "";
+    position: absolute;
+    left: -32px;
+    top: 4px;
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    background: var(--surface);
+    border: 2px solid var(--lane-color);
+  }
+  .stage.is-action::before { border-color: var(--accent); background: var(--accent-soft); }
+  .stage-name {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .stage-name .tag {
+    font-weight: 500;
+    color: var(--text-faint);
+  }
+  .stage-desc {
+    display: block;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    margin-top: 2px;
+    max-width: 56ch;
+  }
+  .stage-desc code {
+    font-family: var(--mono);
+    font-size: 0.94em;
+    background: var(--surface-inset);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.03em;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: 1px;
+  }
+  .badge.action { background: var(--accent-soft); color: var(--accent); }
+
+  /* ---- cross-repo connector ---- */
+  .cross-connector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 24px;
+    margin: -14px 0;
+  }
+  .cross-connector .line {
+    flex: 1;
+    height: 2px;
+    background: repeating-linear-gradient(to right, var(--accent) 0 6px, transparent 6px 11px);
+  }
+  .cross-connector .arrow { color: var(--accent); font-size: 15px; line-height: 1; }
+  .cross-connector .label {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  /* ---- branch (test -> pass/fail -> notify) ---- */
+  .branch-wrap { margin-top: 18px; padding-left: 26px; }
+  .branch-stem {
+    width: 2px;
+    height: 16px;
+    background: var(--lane-color);
+    margin-left: -1px;
+  }
+  .branch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .branch-col {
+    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--col-color);
+    background: var(--col-soft);
+  }
+  .branch-col.pass { --col-color: var(--status-pass); --col-soft: var(--status-pass-soft); }
+  .branch-col.fail { --col-color: var(--status-fail); --col-soft: var(--status-fail-soft); }
+  .branch-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--col-color);
+    margin-bottom: 6px;
+  }
+  .branch-col .stage-name { font-size: 13.5px; }
+  .branch-col .stage-desc { font-size: 12px; }
+  .converge {
+    display: flex;
+    justify-content: center;
+  }
+  .converge .stem {
+    width: 2px;
+    height: 16px;
+    background: var(--lane-color);
+  }
+  .notify-box {
+    margin-top: 0;
+    border: 1.5px solid var(--lane-color);
+    border-radius: 8px;
+    padding: 14px 16px;
+    background: var(--surface-inset);
+  }
+
+  /* ---- side card: playwright-automation-script ---- */
+  .side-card {
+    background: var(--lane-test-soft);
+    border: 1.5px dashed var(--lane-test);
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .side-card h3 {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--lane-test);
+    margin: 0;
+    font-weight: 700;
+  }
+  .side-card p {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    margin: 0;
+    max-width: 68ch;
+  }
+  .side-card code {
+    font-family: var(--mono);
+    font-size: 0.94em;
+    background: var(--surface);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+  .side-card .included-note {
+    font-size: 12px;
+    color: var(--lane-test);
+    font-family: var(--mono);
+  }
+
+  /* ---- footnotes ---- */
+  .notes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .note {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 12.5px;
+    line-height: 1.55;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    color: var(--text-dim);
+  }
+  .note strong { color: var(--text); font-weight: 600; }
+  .note .mark {
+    font-family: var(--mono);
+    font-weight: 700;
+    color: var(--accent);
+    flex: none;
+  }
+  .note code { font-family: var(--mono); font-size: 0.95em; background: var(--surface-inset); padding: 1px 5px; border-radius: 4px; color: var(--text); }
+
+  @media (max-width: 620px) {
+    .branch { grid-template-columns: 1fr; }
+    h1 { font-size: 23px; }
+    .lane { padding: 18px 16px 20px; }
+    .cross-connector { padding: 0 4px; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="top">
+    <p class="eyebrow">CD Initiative — Revised Design, July 2026</p>
+    <h1>The complete release pipeline</h1>
+    <p class="lede">From a merge request on <code>cim-solution</code> to a deployed, tested, and — if broken — automatically reverted release. Three repositories, one continuous flow, no manual step in the middle.</p>
+  </header>
+
+  <div class="legend">
+    <span class="legend-item"><i class="dot build"></i>cim-solution — chart lifecycle</span>
+    <span class="legend-item"><i class="dot deploy"></i>cx-environments-cd — deploy lifecycle</span>
+    <span class="legend-item"><i class="dot test"></i>playwright-automation-script — test logic (included, not duplicated)</span>
+    <span class="legend-item"><i class="dot pass"></i>pass path</span>
+    <span class="legend-item"><i class="dot fail"></i>fail → auto-revert</span>
+    <span class="legend-item"><i class="dot action"></i>human action point</span>
+  </div>
+
+  <!-- LANE 1: cim-solution -->
+  <section class="lane" style="--lane-color: var(--lane-build);">
+    <h2 class="lane-header"><span class="repo-name">cim-solution</span><span class="lane-sub">chart lifecycle — triggered by the MR</span></h2>
+    <ol class="stage-list">
+      <li class="stage">
+        <span class="stage-name">detect_charts</span>
+        <span class="stage-desc">Stream team's MR lands. Diffs against the target branch to find which Helm charts changed.</span>
+      </li>
+      <li class="stage">
+        <span class="stage-name">package_charts</span>
+        <span class="stage-desc">Auto-calculates the next <code>-rc.N</code> version from the registry, updates <code>Chart.yaml</code>, runs <code>helm lint</code>, packages the chart.</span>
+      </li>
+      <li class="stage">
+        <span class="stage-name">publish_charts</span>
+        <span class="stage-desc">Pushes the packaged chart to the GitLab Helm registry — the single source of truth for chart versions.</span>
+      </li>
+      <li class="stage is-action">
+        <span class="stage-name">bump:&lt;site&gt;<span class="badge action">manual</span></span>
+        <span class="stage-desc">One button per site. The only human click on this side of the pipeline — a site pulls the new version when it's ready for them, on their own schedule.</span>
+      </li>
+    </ol>
+  </section>
+
+  <div class="cross-connector">
+    <span class="line"></span>
+    <span class="label">writes version pin →</span>
+    <code style="font-family: var(--mono); font-size: 11.5px; color: var(--accent);">&lt;site&gt;/apps.yaml</code>
+    <span class="arrow">→</span>
+  </div>
+
+  <!-- LANE 2: cx-environments-cd -->
+  <section class="lane" style="--lane-color: var(--lane-deploy);">
+    <h2 class="lane-header"><span class="repo-name">cx-environments-cd</span><span class="lane-sub">deploy lifecycle — one pipeline, per site (and per tenant on multi-tenant sites), fully independent</span></h2>
+    <ol class="stage-list">
+      <li class="stage">
+        <span class="stage-name">pre-deploy:&lt;site&gt;</span>
+        <span class="stage-desc">ConfigMaps, TLS secrets, ImagePullSecrets, Vault/CSI RBAC — templated per environment, applied before Helm touches anything.</span>
+      </li>
+      <li class="stage">
+        <span class="stage-name">deploy:&lt;site&gt;</span>
+        <span class="stage-desc"><code>helm upgrade -f &lt;site&gt;/values.yaml</code> — this site's config, not the chart's defaults. Inline rollback if the upgrade itself fails.</span>
+      </li>
+      <li class="stage">
+        <span class="stage-name">post-deploy:&lt;site&gt;</span>
+        <span class="stage-desc">Tenant creation, Grafana dashboards, Metabase, MinIO data — idempotent, skipped if already applied.</span>
+      </li>
+      <li class="stage">
+        <span class="stage-name">test:&lt;site&gt;<span class="badge action">extends</span></span>
+        <span class="stage-desc">Runs the regression suite <em>in this pipeline</em> — the job definition is included from <code>playwright-automation-script</code>, not cloned or duplicated. See the card at right.</span>
+      </li>
+    </ol>
+
+    <div class="branch-wrap">
+      <div class="branch-stem"></div>
+      <div class="branch">
+        <div class="branch-col pass">
+          <div class="branch-label">Tests passed</div>
+          <span class="stage-name" style="font-size:13px;">— straight through</span>
+          <span class="stage-desc">No rollback job runs. Its absence is itself the signal.</span>
+        </div>
+        <div class="branch-col fail">
+          <div class="branch-label">Tests failed</div>
+          <span class="stage-name">rollback:&lt;site&gt;</span>
+          <span class="stage-desc"><code>helm rollback</code> to the previous known-good revision.</span>
+        </div>
+      </div>
+      <div class="converge"><div class="stem"></div></div>
+      <div class="notify-box">
+        <span class="stage-name">notify:&lt;site&gt;</span>
+        <span class="stage-desc">Always runs. Reads <code>test:&lt;site&gt;</code>'s own results directly — same pipeline, no cross-project lookup — and whether rollback fired. Posts one aggregate Google Chat card either way.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- SIDE CARD: playwright-automation-script -->
+  <aside class="side-card">
+    <h3>playwright-automation-script</h3>
+    <p>Owns the test script, browser image, and reporter config — QA's repo, QA's cadence. <span class="included-note">include: project: 'qa/playwright-automation-script', ref: 'v5.4.0'</span> pulls the job definition into <code>cx-environments-cd</code> at the pinned version; nothing here is cloned or re-typed elsewhere.</p>
+    <p>Its own <code>.gitlab-ci.yml</code> is untouched by any of this — QA still runs it standalone for authoring and debugging, exactly as before.</p>
+  </aside>
+
+  <div class="notes">
+    <div class="note"><span class="mark">!</span><span><strong>allow_failure must stay false</strong> on <code>test:&lt;site&gt;</code> — a masked failure means <code>rollback</code> never fires.</span></div>
+    <div class="note"><span class="mark">!</span><span><strong>rollback stays <code>when: manual</code></strong> until the suite's flakiness sources are fixed (CRM-777) — auto-revert on a flaky test is worse than no rollback.</span></div>
+    <div class="note"><span class="mark">!</span><span><strong>Migration-carrying releases skip auto-rollback</strong> and route to manual approval instead (CRM-780) — <code>helm rollback</code> doesn't undo a database migration.</span></div>
+    <div class="note"><span class="mark">!</span><span><strong>Multi-tenant sites add a tenant layer</strong> — <code>pre-deploy-tenant</code>/<code>deploy-tenant:&lt;site&gt;:&lt;tenant&gt;</code> jobs create a per-tenant namespace, copy in certs/secrets from <code>ef-external</code>/<code>expertflow</code>/<code>vault</code>, and deploy <code>MTT-single</code> — same test → rollback → notify shape shown above, just parameterized per tenant instead of per site. Single-tenant sites (devops, RMT) skip this layer entirely. See the CD plan §2 for the full namespace model.</span></div>
+  </div>
+
+</div>
