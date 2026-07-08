@@ -4,6 +4,7 @@
 > **Produced by:** Problem Inventory analysis + stakeholder corrections (June 2026)
 > **Sources:** `problem-inventory-cicd-test-automation.md`, `docs/cicd_objectives_gaps.md`, `team_input/Road to CD.md`, Confluence retro pages, direct stakeholder input (Haroon — RMT, Junaid — RMT)
 > **Last updated:** 2026-07-01
+> **See also:** `cicd-objective-realignment-and-parallel-workplan-2026-07.md` — re-anchors the objective/pain points behind this whole list and restructures the CD-adjacent items (T1-1b, T1-3, T1-4, T1-5, T2-3) into parallel tracks with explicit convergence gates, rather than a single sequential timeline.
 
 ---
 
