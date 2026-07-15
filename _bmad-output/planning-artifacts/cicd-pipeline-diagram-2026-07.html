@@ -404,7 +404,7 @@
   <header class="top">
     <p class="eyebrow">CD Initiative — Revised Design, July 2026</p>
     <h1>The complete release pipeline</h1>
-    <p class="lede">From a merge request on <code>cim-solution</code> to a deployed, tested, and — if broken — automatically reverted release. Three repositories, one continuous flow, no manual step in the middle.</p>
+    <p class="lede">From a merge request on <code>cim-solution</code> to a deployed, tested, and — if broken — automatically reverted release. Three repositories, one continuous flow — no manual <em>work</em> in the middle, only two one-button <em>decisions</em>: which MR enters (<code>detect</code>), which site goes live (<code>bump</code>).</p>
   </header>
 
   <div class="legend">
@@ -420,9 +420,9 @@
   <section class="lane" style="--lane-color: var(--lane-build);">
     <h2 class="lane-header"><span class="repo-name">cim-solution</span><span class="lane-sub">chart lifecycle — triggered by the MR</span></h2>
     <ol class="stage-list">
-      <li class="stage">
-        <span class="stage-name">detect_charts</span>
-        <span class="stage-desc">Stream team's MR lands. Diffs against the target branch to find which Helm charts changed.</span>
+      <li class="stage is-action">
+        <span class="stage-name">detect_charts<span class="badge action">manual</span></span>
+        <span class="stage-desc">Stream team's MR lands. Deliberately manual — with several MRs open, this click picks <em>which one</em> enters the pipeline, in priority order. Diffs the MR against its base to find which Helm charts <em>and which pre/post-deployment files</em> changed.</span>
       </li>
       <li class="stage">
         <span class="stage-name">package_charts</span>
@@ -434,15 +434,15 @@
       </li>
       <li class="stage is-action">
         <span class="stage-name">bump:&lt;site&gt;<span class="badge action">manual</span></span>
-        <span class="stage-desc">One button per site. The only human click on this side of the pipeline — a site pulls the new version when it's ready for them, on their own schedule.</span>
+        <span class="stage-desc">One button per site — THE go-live decision. Writes the site's <em>complete</em> state into <code>cx-environments-cd</code> as one changeset: chart pins in <code>apps.yaml</code> plus verbatim copies of the MR's changed pre/post-deployment files (site level and <em>all</em> tenant folders together). Known charts → pushes straight to main. Changeset includes a chart new to this site → the whole changeset goes into a single auto-generated MR instead (pin + values seeded from the chart's own <code>values.yaml</code>, reviewer fixes site-specifics; merge = the one deploy moment). Touches nothing on the cluster either way.</span>
       </li>
     </ol>
   </section>
 
   <div class="cross-connector">
     <span class="line"></span>
-    <span class="label">writes version pin →</span>
-    <code style="font-family: var(--mono); font-size: 11.5px; color: var(--accent);">&lt;site&gt;/apps.yaml</code>
+    <span class="label">writes site state (pins + files) →</span>
+    <code style="font-family: var(--mono); font-size: 11.5px; color: var(--accent);">sites/&lt;site&gt;/</code>
     <span class="arrow">→</span>
   </div>
 
@@ -452,11 +452,11 @@
     <ol class="stage-list">
       <li class="stage">
         <span class="stage-name">pre-deploy:&lt;site&gt;</span>
-        <span class="stage-desc">ConfigMaps, TLS secrets, ImagePullSecrets, Vault/CSI RBAC — templated per environment, applied before Helm touches anything.</span>
+        <span class="stage-desc">Automatic — the whole chain fires when a commit lands on main touching <code>sites/&lt;site&gt;/**</code> (<code>rules: changes:</code>; <code>[skip ci]</code> opts out). Applies only the pre-deployment files the commit range changed — ConfigMaps, TLS secrets, ImagePullSecrets, Vault/CSI RBAC, tenant namespaces + cross-namespace secret copies — read locally from <code>sites/&lt;site&gt;/</code>. Unchanged files: logged, skipped.</span>
       </li>
       <li class="stage">
         <span class="stage-name">deploy:&lt;site&gt;</span>
-        <span class="stage-desc"><code>helm upgrade -f &lt;site&gt;/values.yaml</code> — this site's config, not the chart's defaults. Inline rollback if the upgrade itself fails.</span>
+        <span class="stage-desc"><code>helm upgrade -f &lt;site&gt;/helm-values/&lt;chart&gt;-custom-values.yaml</code> — but only for charts whose pin or values file changed since the last applied marker; the rest are logged and skipped. No shared/fallback values file; a chart with no values file hard-fails the job rather than deploying generic config. Inline rollback if the upgrade itself fails.</span>
       </li>
       <li class="stage">
         <span class="stage-name">post-deploy:&lt;site&gt;</span>
@@ -498,10 +498,12 @@
   </aside>
 
   <div class="notes">
+    <div class="note"><span class="mark">!</span><span><strong>Two one-button decisions, everything else automatic</strong> — settled July 2026 (plan §3.6). <code>detect</code> picks which MR; <code>bump:&lt;site&gt;</code> is the go-live decision and the only writer of site state. Both buttons are <strong>Maintainer-gated via an in-script members-API check</strong> (plan §3.7 — Protected Environments was first choice but needs Premium; instance verified Free tier 2026-07-10. Matters most once the factory moves into <code>cim-solution</code>, where every stream developer is a member). After that, <em>any commit landing on <code>cx-environments-cd</code> main deploys what it touched</em> — including direct config edits by engineers (edit → push → that site redeploys just the change), the common RMT toggle-a-config case. <code>[skip ci]</code> opts a commit out (rollback state-reverts, bulk restructures). Sharp edge, accepted: opt-out model — a bulk commit without <code>[skip ci]</code> deploys everything it touched; main stays protected. This re-scopes CRM-763's "no manual step": no manual <em>work</em>, only one-button <em>decisions</em>.</span></div>
+    <div class="note"><span class="mark">!</span><span><strong>Skip-if-unchanged is one mechanism for everything</strong> — an in-cluster marker per site stores the last-applied <code>cx-environments-cd</code> commit SHA; each run diffs <code>marker..HEAD -- sites/&lt;site&gt;/</code> and touches only what changed (chart pins, values files, pre/post-deploy files). Marker advances only on a fully successful chain; rollback resets it.</span></div>
     <div class="note"><span class="mark">!</span><span><strong>allow_failure must stay false</strong> on <code>test:&lt;site&gt;</code> — a masked failure means <code>rollback</code> never fires.</span></div>
-    <div class="note"><span class="mark">!</span><span><strong>rollback stays <code>when: manual</code></strong> until the suite's flakiness sources are fixed (CRM-777) — auto-revert on a flaky test is worse than no rollback.</span></div>
+    <div class="note"><span class="mark">!</span><span><strong>rollback stays <code>when: manual</code></strong> until the suite's flakiness sources are fixed (CRM-777) — auto-revert on a flaky test is worse than no rollback. And rollback reverts <em>state, not just cluster</em>: <code>helm rollback</code> the affected releases <strong>plus</strong> a <code>[skip ci]</code> commit reverting the same pins/files in <code>cx-environments-cd</code> — otherwise the repo keeps declaring the failed version and the next deploy re-arms it.</span></div>
     <div class="note"><span class="mark">!</span><span><strong>Migration-carrying releases skip auto-rollback</strong> and route to manual approval instead (CRM-780) — <code>helm rollback</code> doesn't undo a database migration.</span></div>
-    <div class="note"><span class="mark">!</span><span><strong>Multi-tenant sites add a tenant layer</strong> — <code>pre-deploy-tenant</code>/<code>deploy-tenant:&lt;site&gt;:&lt;tenant&gt;</code> jobs create a per-tenant namespace, copy in certs/secrets from <code>ef-external</code>/<code>expertflow</code>/<code>vault</code>, and deploy <code>MTT-single</code> — same test → rollback → notify shape shown above, just parameterized per tenant instead of per site. Single-tenant sites (devops, RMT) skip this layer entirely. See the CD plan §2 for the full namespace model.</span></div>
+    <div class="note"><span class="mark">!</span><span><strong>Every site adds a tenant layer — no exceptions</strong> — <code>pre-deploy-tenant</code>/<code>deploy-tenant:&lt;site&gt;:&lt;tenant&gt;</code> run automatically inside the same commit-triggered chain (no extra click — the bump changeset already advanced site level and all tenant folders together): create the per-tenant namespace, copy in certs/secrets from <code>ef-external</code>/<code>expertflow</code>/<code>vault</code>, deploy <code>MTT-single</code> — same test → rollback → notify shape, parameterized per tenant. There's no single-tenant site: RMT's real tenants are <code>mtt01</code>/<code>mtt02</code>/<code>mtt04</code>; devops has one placeholder tenant (<code>devops01</code>) until a real one is onboarded. See the CD plan §2.2 for the full namespace model.</span></div>
   </div>
 
 </div>
