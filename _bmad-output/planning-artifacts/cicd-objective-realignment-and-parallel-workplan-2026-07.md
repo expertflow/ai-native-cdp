@@ -154,7 +154,7 @@ Five tracks. **All five start now.** The only sequencing that matters is the fou
 
 ## 7. What "Done" Looks Like
 
-- A stream team raises an MR → within minutes, they know whether it's deployed, tested, and (if broken) already reverted — with no person having clicked anything.
+- A stream team raises an MR → once it's picked up, they know whether it's deployed, tested, and (if broken) already reverted — with no manual *work* anywhere, only two deliberate one-button *decisions*: `detect_charts` (which MR enters, in priority order) and `bump:<site>` (which site goes live, when). *(Re-scoped July 2026 — the original "no person having clicked anything" wording is superseded by the settled control-flow design, `cd-initiative-implementation-plan-2026-07.md` §3.6: the clicks are deliberate control points, not automation gaps.)*
 - QA's day-to-day work is writing and maintaining tests in `playwright-automation-script`, not clicking through regression manually.
 - "Coverage" is a number people trust, tied to a real inventory, not inflated by stubs.
 - A red security finding blocks a merge — every time, not "when someone reads the report."
