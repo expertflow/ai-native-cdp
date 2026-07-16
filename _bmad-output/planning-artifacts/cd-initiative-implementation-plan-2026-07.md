@@ -91,7 +91,7 @@ cx-environments-cd/
 
 Onboarding a new tenant on an existing site is: add a folder under `sites/<site>/tenants/<new-id>/`. Onboarding an entirely new site is: add a `sites/<new-site>/` folder, including its own `tenants/` subdirectory (a single placeholder tenant if nothing real is onboarded yet — see `devops01` above).
 
-**Second correction, surfaced while populating real RMT data (CRM-783):** the original design (§1, §3) assumed one shared `sites/<site>/values.yaml` was enough, passed via `-f` to every chart's `helm upgrade` in the deploy loop — true only while the POC's `devops/values.yaml` had 2-3 generic keys. Real RMT data is ~20 substantially different charts (`cx-campaigns-custom-values.yaml`, `ef-keycloak-custom-values.yaml`, etc.), each scoped to its own chart — merging all of them into one shared file risks key collisions and forces irrelevant config onto every unrelated chart's install. The first fix attempt kept the shared file as a fallback for any chart without its own values file; the stakeholder correctly rejected this — a silent generic-config deploy is exactly the "looks green, is actually broken" failure mode the initiative exists to remove. **There is no shared/fallback values file.** Every chart pinned in `apps.yaml` must have its own `sites/<site>/helm-values/<chart>-custom-values.yaml` (named after the real Helm chart name — `Chart.yaml`'s `name:` field, not always the same as the release name or the source values filename — with the `-custom-values.yaml` suffix and `helm-values/` folder matching the naming convention already used in `tmp/helm-values/`); `.deploy_env` hard-fails with a clear error if one is missing, rather than deploying with incomplete config. RMT's `minio`/`postgresql` are pinned in `apps.yaml` but currently have no values file — `deploy:rmt` will fail on them until real values are provided (§8).
+**Second correction, surfaced while populating real RMT data (CRM-783):** the original design (§1, §3) assumed one shared `sites/<site>/values.yaml` was enough, passed via `-f` to every chart's `helm upgrade` in the deploy loop — true only while the POC's `devops/values.yaml` had 2-3 generic keys. Real RMT data is ~20 substantially different charts (`cx-campaigns-custom-values.yaml`, `ef-keycloak-custom-values.yaml`, etc.), each scoped to its own chart — merging all of them into one shared file risks key collisions and forces irrelevant config onto every unrelated chart's install. The first fix attempt kept the shared file as a fallback for any chart without its own values file; the stakeholder correctly rejected this — a silent generic-config deploy is exactly the "looks green, is actually broken" failure mode the initiative exists to remove. **There is no shared/fallback values file.** Every chart pinned in `apps.yaml` must have its own `sites/<site>/helm-values/<chart>-custom-values.yaml` (named after the real Helm chart name — `Chart.yaml`'s `name:` field, not always the same as the release name or the source values filename — with the `-custom-values.yaml` suffix and `helm-values/` folder matching the naming convention already used in `tmp/helm-values/`); `.deploy_env` hard-fails with a clear error if one is missing, rather than deploying with incomplete config. (RMT's `minio`/`postgresql` values were the last gap — resolved July 2026, see §8; all 22 RMT charts now have real values files.)
 
 ### 2.3 Two audiences — `cim-solution` is also the on-prem customer's repo
 
@@ -110,6 +110,8 @@ The deployment guide's own documented process is `git clone -b CX-5.4.0 https://
 **Forward-looking note, not a decision to act on now:** if/when CX decomposes into independently-releasable packages (T2-8 / CIM-33653), `transflux` is a natural first candidate to carve back out into its own fully independent release (chart + config + schema together, with its own CI/CD) — at which point this consolidation would be reversed. Worth remembering when that initiative reaches this component; not a reason to hold off now.
 
 **How `pre-deploy` handles it, concretely, once the move is done:**
+
+> **Superseded in part (July 2026 design review, §3.6):** the `git archive --remote=cim-solution` fetch below is no longer the mechanism. Per §3.6 item 2, `bump:<site>` copies the actual pre/post-deployment files into `sites/<site>/` in `cx-environments-cd` itself — the pre-deploy job reads them locally from the checkout, no cross-repo fetch at deploy time. The cert-export/ConfigMap-regeneration steps below remain accurate.
 
 ```yaml
 # cx-environments-cd — pre-deploy job for a transflux-hosting namespace
@@ -197,13 +199,26 @@ helm upgrade --install "$REL" "cxcharts/$name" --version "$ver" \
 ```
 This directly implements CRM-769's rollback ticket, at the *correct* location now that deploy authority has moved to `cx-environments-cd`.
 
-Also: set `HELM_WAIT="true"` (or a per-site override) at least for RMT, so a bad rollout is caught by the deploy job itself.
+**Update (July 2026):** implemented — plus a `DRY_RUN` guard the snippet above lacks (a dry-run failure is a validation error; rolling back a real release over it would be wrong). **Addendum from the July 2026 design review (§3.6 item 6):** rollback must also revert the *declared state* — the `apps.yaml` pins (and copied pre/post-deploy files) in `cx-environments-cd`, committed with `[skip ci]` — not just the cluster. Cluster-only rollback leaves the repo pointing at the failed version, and the next deploy re-arms the failure. Applies to both this inline rollback and the Phase-2 `rollback:<site>` stage.
+
+Also: set `HELM_WAIT="true"` (or a per-site override) at least for RMT, so a bad rollout is caught by the deploy job itself. **(Done, July 2026 — job-level override on `deploy:rmt`.)**
 
 **Severity:** High. **Effort:** Small. **Owner:** Haroon Ahmed (took over from Umar Naveed, July 2026).
 
 ### 3.6 Pre-deploy and post-deploy resources — namespace-aware, tenant-aware (ties to CRM-771/772)
 
 **Finding:** This pipeline only ever runs `helm upgrade`. Real deployment also requires, per §2: namespace creation for new tenants, cross-namespace cert/secret/configmap copying (`ef-external`/`expertflow`/`vault` → `<tenant-id>`), transflux config generation, tenant creation, Grafana/Metabase provisioning, MinIO data.
+
+**Settled control-flow design (July 2026 design review — supersedes the earlier "manual trigger on pre-deploy" correction, which was itself based on a misreading of the bump commits as automatic; the POC's `bump:<site>` is a manual per-team button, and that turns out to be the right design):**
+
+1. **Two human decision points, each a one-button choice — everything else automatic.** `detect_charts` stays manual: with several MRs open, it picks *which MR* enters the pipeline (prioritization). `bump:<site>` stays manual: it is THE go-live decision — *which site* takes the change, and when. Nothing downstream of bump needs a click. This re-scopes CRM-763's "no manual step" acceptance criterion to its real intent: **no manual work, only one-button manual decisions** — never a procedure someone must know by heart.
+2. **`cx-environments-cd` is the complete, self-contained state of every site.** Charts are represented by version pin (the package lives in the Helm registry — the pin fully identifies it). Pre/post-deployment resources have no registry, so the **actual files** live in the repo, per site. `bump:<site>` therefore writes both: chart pins into `apps.yaml` *and* verbatim copies of the MR's changed/added pre/post-deployment files into `sites/<site>/` (deletions honored via `--name-status`). One changeset advances the whole site's state atomically — site level and **all tenant folders together** (never one MR per tenant).
+3. **New-chart onboarding (re-litigation of the no-fallback-values decision, resolved):** when the changeset includes a chart not yet pinned on the target site, bump routes the **entire changeset** through a single MR on `cx-environments-cd` instead of pushing to main: the new pin plus `helm-values/<chart>-custom-values.yaml` seeded verbatim from the chart's own `values.yaml`; the reviewer edits the site-specific fields; **merging that MR is the single deploy moment for everything in the changeset** (atomicity over speed — the existing-chart updates in the same changeset deliberately wait on the review). Known-chart changesets push directly to main. Both paths end identically: one commit on main = one deploy moment. A repeat bump while the onboarding MR is open updates that MR, never opens a duplicate.
+4. **Commit-as-trigger:** any commit landing on `cx-environments-cd`'s main deploys what it touched. Per-site scoping via `rules: changes:` (`sites/rmt/**` → RMT's chain only). `[skip ci]` opts out — used by rollback's state-revert commits and by bulk/structural changes. Direct config edits by engineers are a first-class path (edit → push → that site redeploys exactly what changed — the common RMT enable/disable-config case). Known sharp edge, accepted: this is an opt-*out* model — a bulk commit without `[skip ci]` deploys everything it touched; main stays protected/reviewed to mitigate.
+5. **Unified skip-if-unchanged:** an in-cluster marker per site stores the last-applied `cx-environments-cd` commit SHA. Every chain run diffs `<marker>..HEAD -- sites/<site>/` — one mechanism for everything: only charts whose pin/values changed get `helm upgrade`; only pre/post-deploy files that changed get applied; everything else is logged "unchanged, skipped". First-ever run (no marker) applies everything. The marker updates only on successful chain completion; rollback resets it.
+6. **Rollback reverts state, not just cluster:** `apps.yaml` + the copied files are the record of what's deployed, so the Phase-2 `rollback:<site>` stage must both `helm rollback` the affected releases *and* revert the corresponding pins/files in `cx-environments-cd` (committed with `[skip ci]`). Without the state-revert, the next deploy re-arms the failure. The inline `.deploy_env` rollback (CRM-784) has the same declared-state drift and gets the same treatment when Phase 2 lands.
+7. **Process assumption, not pipeline-enforced:** two MRs touching the same pre/post-deploy file never deploy concurrently — team rule: deploy one, test, merge to the RC branch; the second MR pulls the RC branch (resolving the conflict git now forces) before it deploys. Tripwire in the pipeline: bump warns loudly when it is about to overwrite a `sites/<site>/` file modified since the last bump.
+8. **Stage roles under this model** — bump writes the order (git only, no cluster access: the factory repo deliberately holds no `KUBE_*` credentials); `pre-deploy` prepares the ground (applies changed ConfigMaps/Secrets/certs/RBAC/tenant namespaces from the copied files); `deploy` installs the changed charts (helm, inline rollback, `HELM_WAIT`); `post-deploy` finishes on the running stack (application-level tenant creation, Grafana, MinIO seeding — idempotent); `test`/`rollback`/`notify` judge, undo if needed, report.
 
 **Fix:** Two distinct pre-deploy shapes, not one generic stage:
 
@@ -250,12 +265,24 @@ This is exactly what CRM-771/772 scope, and §2.4 gives the transflux-specific p
 1. Scope the bump token to a **Project Access Token** with the minimum role (`write_repository` only, on `cx-environments-cd` alone), rotated on a schedule.
 2. Use **GitLab Protected Branches "Allowed to push"** for `main`, explicitly listing the bump-bot rather than leaving the branch fully unprotected.
 
+**Addendum (July 2026 design review) — who may click `detect_charts` and `bump:<site>`: Maintainers only, enforced in-script.** The two manual decision buttons (§3.6 item 1) get gated so only users with Maintainer access can trigger them — necessary at latest when the factory moves into `cim-solution`, where every stream developer is a member (today `cx-charts-cd`'s small membership is the accidental gate).
+
+**Mechanism (verified 2026-07-10):** the first-choice mechanism, GitLab **Protected Environments**, is a Premium feature and `gitlab.expertflow.com` is **Free tier** — confirmed by the absence of the "Protected environments" section in cim-solution's Settings → CI/CD (full Maintainer view, so not a permissions artifact). The decided mechanism is therefore the **in-script Maintainer check**: the gated jobs' first step resolves the clicking user (`$GITLAB_USER_ID` is set to whoever runs a manual job) against the members API and fails unless `access_level >= 40`:
+
+```bash
+LEVEL=$(curl -s --header "PRIVATE-TOKEN: $API_TOKEN" \
+  "$CI_API_V4_URL/projects/$CI_PROJECT_ID/members/all/$GITLAB_USER_ID" | jq -r '.access_level // 0')
+[ "$LEVEL" -ge 40 ] || { echo "Only Maintainers may trigger this job (you: level $LEVEL)"; exit 1; }
+```
+
+Known limits, accepted: enforcement-after-click (the button is visible to all members; unauthorized runs fail immediately with a clear message), and the check lives in `.gitlab-ci.yml` so it's removable by anyone with write access to the CI file — but that set is Maintainers, so the threat model holds. Applies to `detect_charts` and every `bump:<site>` job, in the factory repo (`cx-charts-cd` today; re-apply when the factory moves to `cim-solution`). **Upgrade path:** if the instance is ever licensed to Premium, switch to Protected Environments (`environment: name: <site>` on bump, synthetic `release-gate` environment with `action: prepare` on detect; "Allowed to deploy" = Maintainers) — UI-enforced and not script-removable.
+
 **Severity:** Low. **Effort:** Small. **Owner:** Haroon Ahmed (took over from Umar Naveed, July 2026).
 
 ### 3.8 Chart build hygiene carried over from cim-solution's disabled block
 
 - `helm lint ... || true` swallows lint failures — fix when re-enabling
-- `RELEASE_VERSION` hardcoded — confirm bump process is part of the release-cut checklist, not forgotten
+- `RELEASE_VERSION` hardcoded — **intentional, not debt (clarified July 2026):** each release-candidate branch carries its own `RELEASE_VERSION`, so MRs targeting different release trains (e.g. 5.4.0 and 5.5.0 in parallel) version their charts into the right train. The remaining checklist item is only: setting it correctly when a new RC branch is cut.
 - No `cache:` for Helm dependency downloads across pipeline runs
 
 ---
@@ -263,6 +290,8 @@ This is exactly what CRM-771/772 scope, and §2.4 gives the transflux-specific p
 ## 4. Complete Pipeline Design (`include:`-based, namespace- and tenant-aware)
 
 > **Visual version:** `cicd-pipeline-diagram-2026-07.html` (same folder) — renders the core loop below.
+
+> **Read §3.6's settled control-flow design first (July 2026):** it governs how everything below triggers — `bump:<site>` is the manual go-live decision and writes complete site state (pins **and** pre/post-deploy files); the deploy chain fires on commits to `cx-environments-cd` main scoped by `rules: changes:`; skip-if-unchanged is driven by a per-site last-applied-SHA marker. The job sketches below remain valid for *what each job does*, but where a sketch implies a different trigger mechanism, §3.6 wins.
 
 This section gives the concrete, job-by-job design across all three repos: chart lifecycle in `cim-solution` (now including `transflux`'s config/schema per §2.4), deploy lifecycle in `cx-environments-cd` (now site- **and** tenant-aware per §2.2), test *ownership* in `playwright-automation-script`.
 
@@ -393,35 +422,42 @@ Today, the same "clone Playwright repo, `npm ci`, run tests" logic exists in two
 
 ### Phase 1 — Foundation fixes (this sprint)
 - Move committed credentials to CI/CD variables (§3.2) — hygiene fix, do alongside other §3 edits
-- Create `sites/rmt/apps.yaml` + `sites/rmt/values.yaml` under the new folder shape (§2.2, §3.4)
-- Add rollback to `.deploy_env` for helm-upgrade-itself failures (§3.5)
-- Set `HELM_WAIT="true"` for RMT
+- ~~Create `sites/rmt/apps.yaml` + `sites/rmt/values.yaml` under the new folder shape (§2.2, §3.4)~~ **Done (July 2026, CRM-782/783):** full `sites/<site>/tenants/<tenant>/` restructure; all 22 RMT charts (incl. transflux, minio, postgresql) pinned with real per-chart `helm-values/` files
+- ~~Add rollback to `.deploy_env` for helm-upgrade-itself failures (§3.5)~~ **Done (July 2026, CRM-784)**
+- ~~Set `HELM_WAIT="true"` for RMT~~ **Done (July 2026, CRM-785)**
 - Tighten `bump` token scope + protected-branch config (§3.7)
 
-### Phase 2 — Regression + rollback wiring (§4, §5)
+### Phase 2 — Full CD loop: control flow, deployment coverage, regression + rollback wiring (§3.6 settled design, §4, §5; **absorbs former Phase 4, merged July 2026**)
+
+Ordered by dependency — the state-writing side first, then the stages that consume it, then the judge/undo/report tail:
+
+- Extend `bump:<site>` per §3.6: copy changed/added pre/post-deployment files into `sites/<site>/` (deletions included, all tenant folders in the same changeset); overwrite tripwire warning; new-chart onboarding via single auto-generated MR (pin + seeded values, whole changeset held together)
+- Flip `cx-environments-cd` deploy chain to commit-as-trigger: per-site `rules: changes: sites/<site>/**`, `[skip ci]` opt-out, chain runs unattended after any qualifying commit (bump push, onboarding-MR merge, or direct config edit)
+- Implement the unified last-applied-SHA marker + diff-scoped apply/skip for charts and pre/post-deploy files (§3.6 item 5)
+- Add site-level `pre-deploy`/`post-deploy` stages (§3.6) — the consumers of bump's copied files; this is where transflux's runtime config (tenants.yaml ConfigMap, dbt_schema — §2.4) finally gets mounted, closing the known "chart deploys but comes up unconfigured" gap from CRM-783
+- Add tenant-level `pre-deploy-tenant`/`deploy-tenant` for every site (§2.2, §3.6) — per-tenant namespace creation, cross-namespace secret/cert copies, MTT-single deployment
+- Re-enable and clean up `cim-solution`'s `detect/build/publish` stages (the factory move), confirming `transflux`'s moved config/`dbt_schema` (§2.4) is included in what gets versioned/published — and re-applying the Maintainer gate (§3.7) in `cim-solution` when the buttons move there
 - Add `include: project:` + `test:<site>` jobs, starting with RMT
 - Confirm `allow_failure` is **not** `true` on the test job (§4.3)
-- Add `rollback:<site>` — start with `when: manual` until Phase 3 lands
+- Add `rollback:<site>` — start with `when: manual` until Phase 3 lands; must revert declared state (pins + files, `[skip ci]`) as well as the cluster (§3.6 item 6), and reset the marker
 - Add `notify:<site>` aggregating deploy+test+rollback status
 - Remove `regression-test`/`notify-google-chat` from `CX-5.4.0/.gitlab-ci.yml`
+- (§3.3 chart-override metadata generalization stays deferred)
 
 ### Phase 3 — Test-suite hardening (prerequisite to auto-rollback)
 - Remove file-wide serial mode cascade, kill top flake sources, restore coverage integrity (CRM-777/778)
 - **Once flake rate is measurably low:** flip rollback from `when: manual` to `when: on_failure` for RMT
 
-### Phase 4 — Full deployment coverage, namespace- and tenant-aware (matches CRM-771/772, extended per §2)
-- Add site-level `pre-deploy`/`post-deploy` stages (§3.6)
-- Add tenant-level `pre-deploy-tenant`/`deploy-tenant` for multi-tenant sites (§2.2, §3.6), including transflux config generation (§2.4)
-- Re-enable and clean up `cim-solution`'s `detect/build/publish` stages, confirming `transflux`'s moved config/`dbt_schema` (§2.4) is included in what gets versioned/published
-- (§3.3 chart-override metadata generalization stays deferred)
+### Phase 4 — ~~Full deployment coverage, namespace- and tenant-aware~~ **Merged into Phase 2 (July 2026)**
+All former Phase 4 items now live in Phase 2 above — the split had bump copying pre/post-deploy files in Phase 2 while the stages that *apply* them waited for Phase 4, leaving the files inert in the repo and transflux unconfigured in the meantime. Merging closes that gap in one phase. Number kept as a tombstone so existing references ("Phase 4" in tickets/memories) still resolve here.
 
 ### Phase 5 — Cluster access convergence (deferred, revisit once GitLab admin confirms KAS availability)
 - Register GitLab Agent, migrate off static `KUBE_URL`/`KUBE_TOKEN`
 
-### Phase 6 — GitHub Pages release promotion (explicitly sequenced after Phases 1–4, not before)
+### Phase 6 — GitHub Pages release promotion (explicitly sequenced after the core loop — Phases 1–3 — not before)
 **Confirmed in scope, lower priority.** Today, Haroon manually promotes charts from the GitLab RC registry to the public `expertflow.github.io/charts` repo once testing passes and a release is ready. Document this process formally first; automating it (a `publish:release` job triggered on a release tag, pushing to GitHub Pages) is the follow-on once the core loop (Phases 1–4) is stable. Not started.
 
-### Phase 7 — Secrets → Vault migration (explicitly sequenced after Phases 1–4, not before)
+### Phase 7 — Secrets → Vault migration (explicitly sequenced after the core loop — Phases 1–3 — not before)
 **Confirmed in scope, lower priority.** Given Vault is already deployed as part of the stack, the durable fix for the broader hardcoded-credential pattern found across `helm-values/*.yaml` and `transflux/config/*.yaml` (mostly intentional shared defaults per §3.2, but worth consolidating regardless) is migrating them to Vault-backed references rather than plaintext YAML — following the same secret-copy-between-namespaces pattern the deployment guide already uses for TLS certs. Not started; scope this properly once Phases 1–4 are live.
 
 ---
@@ -449,8 +485,8 @@ Today, the same "clone Playwright repo, `npm ci`, run tests" logic exists in two
 | Add inline rollback to `.deploy_env` | §3.5 | [CRM-784](https://expertflow-docs.atlassian.net/browse/CRM-784) |
 | Set `HELM_WAIT="true"` for RMT | §3.5 | [CRM-785](https://expertflow-docs.atlassian.net/browse/CRM-785) |
 | Tighten `bump` token scope + protected-branch config | §3.7 | [CRM-786](https://expertflow-docs.atlassian.net/browse/CRM-786) |
-| Tenant-level `pre-deploy-tenant`/`deploy-tenant` jobs (namespace creation, cross-namespace secret/configmap copying) | §3.6 | Not yet ticketed — Phase 4, large, ticket once Phase 1 lands |
-| Move `cim/transflux`'s `config/` + `dbt_schema/` into `cim-solution`; archive `cim/transflux` | §2.4 | Not yet ticketed — Phase 4 |
+| Tenant-level `pre-deploy-tenant`/`deploy-tenant` jobs (namespace creation, cross-namespace secret/configmap copying) | §3.6 | Not yet ticketed — Phase 2 (was Phase 4, merged July 2026), large, ticket once Phase 1 lands |
+| Move `cim/transflux`'s `config/` + `dbt_schema/` into `cim-solution`; archive `cim/transflux` | §2.4 | Not yet ticketed — Phase 2 (was Phase 4, merged July 2026) |
 | `cx-data-platform` CI hygiene (build pipeline, security scanning) | Separate track (confirmed) | Not this initiative's scope |
 | GitHub Pages release-promotion automation | §6, Phase 6 | Not yet ticketed — explicitly deferred until Phases 1–4 are live |
 | Vault migration for hardcoded config values | §6, Phase 7 | Not yet ticketed — explicitly deferred until Phases 1–4 are live |
@@ -459,8 +495,17 @@ Today, the same "clone Playwright repo, `npm ci`, run tests" logic exists in two
 
 ## 8. Open Items
 
-- **Rollback target granularity:** does a single failed regression roll back *all* charts deployed in that pipeline run, or only the ones that changed? Relevant once multiple charts can be bumped in the same `apps.yaml` update — confirm approach with Haroon.
-- **Chart-metadata format (§3.3):** worth a short design spike before committing to a specific file format — not blocking Phase 1/2 work.
+- ~~**Rollback target granularity:**~~ **Direction settled (July 2026 design review):** rollback reverts exactly what the failing changeset advanced — `helm rollback` on each release the run upgraded, plus a `[skip ci]` revert of the same pins/files in `cx-environments-cd` (§3.6 item 6). Charts untouched by the changeset are never rolled back. Implementation detail (Phase 2): the changeset diff that scoped the deploy also scopes the rollback.
+- **Chart-metadata format (§3.3):** worth a short design spike before committing to a specific file format — not blocking Phase 1/2 work. **Partially bitten already (July 2026):** `.deploy_env`'s namespace case statement only covered POC-era charts; unmapped charts silently fall through to `expertflow`. Found when the devops dry-run collided vault (own `vault` namespace, now mapped explicitly). Any chart onboarding must check the case statement covers it.
+- **RMT `artemis` pin needs review before deploy:rmt goes real:** artemis is officially deployed as a **system service**, not via its helm chart (confirmed July 2026, during devops validation — the chart pin was dropped from devops for this reason). `sites/rmt/apps.yaml` still pins `artemis: "5.4.0-rc.1"` — likely to remove, decide alongside the RMT go-live review.
 - ~~**`sites/mtt/` naming:** confirm the actual site-level grouping name...~~ **Resolved (July 2026):** there is no separate `mtt` site — `mtt01`/`mtt02`/`mtt04` are RMT's own tenants. §2.2 updated accordingly.
-- **`minio`/`postgresql` real values for RMT:** `sites/rmt/helm-values/minio-custom-values.yaml` and `postgresql-custom-values.yaml` don't exist yet — real customised values not handed over. There is no fallback file (§2.2) — both charts stay pinned in `apps.yaml` but `deploy:rmt` will hard-fail on them until these two files exist. Either provide the real values, or temporarily drop the two lines from `apps.yaml` to unblock the other 19 charts.
-- **devops real chart/version pins and values:** `sites/devops/` is still the POC's dummy data (`sites/devops/apps.yaml` pins only `agent-desk`, values now at `sites/devops/helm-values/agent-desk-custom-values.yaml`). Real devops onboarding is deferred — RMT is being validated first.
+- ~~**`minio`/`postgresql` real values for RMT**~~ **Resolved (July 2026):** real values handed over and committed as `sites/rmt/helm-values/{minio,postgresql}-custom-values.yaml` (carried verbatim from `tmp/helm-values/ef-{minio,postgresql}-custom-values.yaml`). All 22 RMT charts (incl. `transflux`, added same week) now have values files — `deploy:rmt` no longer has a known hard-fail. Residual note: minio's `rootUser`/`rootPassword` are still the stock chart defaults (`minioadmin`/`minioadmin`) — real handed-over file, not a placeholder, but flag if it should be tightened.
+- ~~**devops real chart/version pins and values**~~ **Resolved (July 2026) — and the deferral reversed:** devops (fresh VM, `gitconnect.expertflow.com` / 192.168.2.205, RKE2 pre-existing) became the pipeline-validation site *ahead of* RMT — a fresh cluster with no users is the safer shakeout target. `sites/devops/` now has a real 12-chart set (full ef-external tier + `cx` Core + `agent-desk`), values carried from `sites/rmt/helm-values/` with devops-only deltas (`ingressRouter` → `gitconnect.expertflow.com`, hostAliases → the VM IP). Known leftovers flagged in the commit: `cx`'s `ACTIVEMQ_*_URL` still point at the RMT-era external ActiveMQ; minio auth is stock defaults.
+
+- **Go-live cutover checklist (July 2026 — collected during factory-move testing; run these together when the pipeline is declared ready, none before):**
+  1. Merge the `CRM-782-sites-tenants-restructure` MR into `cx-environments-cd` `main` — until then, `main` still has the flat POC layout.
+  2. Flip `ENV_REPO_BRANCH` in cim-solution's `.bump_env` from `CRM-782-sites-tenants-restructure` back to `main`.
+  3. **Migrate the charts registry from project 1343 (CX-Charts-CD) to cim-solution's own** — stakeholder-agreed (July 2026): keep 1343 during testing for continuity (existing versions + RC numbering), move at go-live so cx-charts-cd can be archived outright. Steps: flip `CHARTS_PROJECT_ID`/`HELM_REPO_URL` in cim-solution, flip `CHARTS_REPO_URL` in cx-environments-cd, run one factory pass to populate the fresh registry, re-pin via bump.
+  4. CRM-786 hardening: protect `main` (bump-bot allow-listed), mark `ENV_REPO_TOKEN`/`GITLAB_TOKEN` Protected once pipelines run from protected refs, masking + job-token allowlist hygiene.
+  5. Archive `cim/cx-charts-cd` (repo already superseded; registry too, after step 3).
+  6. Merge `5.4.0_f-CRM-765` (factory + regression job) into its RC branch — the moment the factory goes live for every stream team's MRs; Maintainer gate must already be verified working (it will have been, during the loop test).
