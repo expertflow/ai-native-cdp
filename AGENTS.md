@@ -26,10 +26,10 @@ Concretely, when something changes:
 
 Place an item under the T-number whose described problem it addresses. If a new Jira epic maps to an existing item, link it there rather than creating a parallel list (e.g. CIM-33653 → T2-8, the Object Model decoupling blocker).
 
-## External systems — always via MCP, never ad-hoc
+## External systems — never ad-hoc
 
-- **Jira & Confluence** — via the Atlassian MCP server. This initiative spans the **CRM** project (e.g. CRM-706 multi-version upgrade, CRM-763 CD pipeline) and the **CIM** project (e.g. CIM-33653 Object Model decoupling). Jira ticket status is authoritative for individual items.
-- **GitLab** (`https://gitlab.expertflow.com`) — always use the `gitlab` MCP server. Never use the `glab` CLI or raw `curl`/`fetch` for GitLab API calls.
+- **Jira & Confluence** — this initiative spans the **CRM** project (e.g. CRM-706 multi-version upgrade, CRM-763 CD pipeline) and the **CIM** project (e.g. CIM-33653 Object Model decoupling). Jira ticket status is authoritative for individual items. Use whichever Jira/Confluence integration your AI tool has configured (e.g. Claude Code uses `atlassian-cli`); never raw `curl`/`fetch`.
+- **GitLab** (`https://gitlab.expertflow.com`) — use whichever GitLab integration your AI tool has configured (e.g. Claude Code uses the `glab` CLI); never raw `curl`/`fetch`.
 
 ## Communication
 
