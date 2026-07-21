@@ -15,6 +15,6 @@ Project memories go in `.ai/memory/` (AI-agnostic, readable by any tool).
 
 ## Claude-specific tool rules
 
-- **Jira & Confluence** — use the `mcp__claude_ai_Atlassian__*` tools. Projects: **CRM** and **CIM**.
-- **GitLab** (`https://gitlab.expertflow.com`) — use the `gitlab` MCP server (`mcp__gitlab__*`). Never use `glab` CLI or raw `curl`/`fetch`.
+- **Jira & Confluence** — Jira projects for this repo: **CRM** and **CIM**. Tooling follows the global rule (`atlassian-cli`, fallback `acli`).
+- **GitLab** — follows the global rule (`glab` CLI, instance `https://gitlab.expertflow.com`).
 - **Google Chat** — post updates to space `spaces/AAAAyffa-Sk` using the `gws-chat-send` skill.
