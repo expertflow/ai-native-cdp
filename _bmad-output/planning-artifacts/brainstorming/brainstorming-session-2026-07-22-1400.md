@@ -63,3 +63,15 @@ Believed at first: no lighter-weight process had ever been defined for this case
 **Root cause (bedrock):** The only formal release class is "full public release," calibrated for broad blast radius. Even the paper "patch track" inherits that full weight and always ends in a public announcement. There is no lighter-weight, unannounced, single-site, iteration-friendly path — so people bypass the process entirely rather than use a heavy process that doesn't fit the shape of the problem.
 
 **Session decision:** Five Whys concluded here (bedrock reached); proceeding to Role Playing.
+
+### Technique 2: Role Playing
+
+**Persona 1 — Field/Support Engineer** (about to do the dark launch):
+Purely time cost. The official patch path isn't distrusted, unknown, or hard to get approved for a single customer — it's simply too slow relative to the urgency, even though it technically exists on paper.
+
+**Persona 2 — Release Manager (Haroon/RMT)** (owns the full process, enforces full regression + announcement on every release including patches):
+Full regression is required on every release, including narrow single-customer patches, because RMT has **no way to scope regression down to just the affected component** — the tooling/process can only run the whole regression suite, not a targeted subset tied to blast radius.
+
+**Roles still to explore next session:** Customer, On-call/Go-No-Go approver, possibly stream-aligned dev who builds the iterative fix.
+
+**SESSION PAUSED HERE — 2026-07-22.** Resume by continuing Role Playing (Customer and Approver personas), then proceed to Assumption Reversal.
