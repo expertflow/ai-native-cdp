@@ -5,8 +5,10 @@ session_topic: 'Dark launches — ad hoc, unannounced deployments at customer si
 session_goals: 'Understand root causes of why the org resorts to dark launches; generate better structural alternatives that avoid the need for them or prevent the state drift they cause'
 selected_approach: 'ai-recommended'
 techniques_used: ['Five Whys', 'Role Playing', 'Assumption Reversal']
-ideas_generated: []
+ideas_generated: ['Scope regression to changed component + notify domain owners + local-lab testing as right-sized validation', 'Announcement''s real function is informing RMT for accurate upgrade guides, not public disclosure', 'Separate state-capture (mandatory, immediate) from candidacy decision (human judgment, later)', 'State capture must be an automatic side effect of the deploy mechanism, not a remembered human step', 'Need a shared dark-launch choke point (CLI wrapper/ChatOps/etc.) since deploys are currently ad hoc per engineer']
 context_file: '.ai/memory/project-cicd-dark-launch-drift.md'
+session_continued: true
+continuation_date: '2026-07-22'
 ---
 
 # Brainstorming Session Results
@@ -97,4 +99,12 @@ Key insight: **state capture and candidacy decision are two separate, parallel q
 - Humans cannot be relied on to manually record state capture in the heat of an urgent fix — it needs to be a side effect of the deploy mechanism itself, not a separate remembered step.
 - **Current constraint surfaced:** there is no single choke point today — dark launches are done ad hoc per engineer (no shared script/Helm command/CI job), so there's no natural place yet to attach automatic state capture.
 
-**SESSION PAUSED HERE — 2026-07-22.** Assumption Reversal's three reversals complete. Next: decide whether to keep generating (e.g., what a shared dark-launch choke point / state-capture mechanism could look like) or move to convergence/synthesis.
+**Continuing Assumption Reversal — digging into the choke-point mechanism (Reversal 3 follow-up):**
+
+Since dark launches are ad hoc per engineer with no shared choke point today, the open design question is what a shared mechanism would need to do:
+- **Form factor:** CLI wrapper vs. MR template vs. ChatOps command vs. something else, matched to how engineers actually work day to day.
+- **What state to grab:** just the chart version/pin, or also pre/post-deploy files and site-specific config overrides.
+- **When to grab it:** before the dark launch (declare intent) vs. after (confirm what actually landed) — relevant because the fix is often iterative/hit-and-try before it's finalized.
+- **Where the record lands right after capture:** straight into `cx-environments-cd` as an unofficial/flagged entry, or a separate staging ledger that only merges in once the candidacy call is made.
+
+**SESSION PAUSED HERE — 2026-07-22, to resume 2026-07-23 with Nabeel and Haroon.** Assumption Reversal's three reversals are complete; the choke-point mechanism (form factor, what/when to capture, where the record lands) is queued as the next thread to generate ideas on, before moving to convergence/synthesis.
