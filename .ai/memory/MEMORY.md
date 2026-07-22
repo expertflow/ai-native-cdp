@@ -11,3 +11,4 @@
 - [CD: Settled Control-Flow Design](project-cicd-manual-deploy-trigger.md) — bump:<site> is the manual go-live gate + sole writer of full site state (pins AND pre/post-deploy files); commits to cx-environments-cd main auto-deploy what they touched; rollback reverts state too — governs all Phase 2+ implementation
 - [Artemis = systemservice, not helm](project-cx-artemis-deployment-mode.md) — official artemis deployment is a system service; don't pin the chart (RMT's pin needs review); vault runs in its own "vault" namespace; .deploy_env's namespace fall-through only fits app-tier charts
 - [CRM-763 Bundle](project-cicd-crm-763-bundle.md) — Haroon committed CRM-782 + CRM-783 complete together with parent CRM-763, one delivery unit not staggered tasks
+- [Dark Launch Drift](project-cicd-dark-launch-drift.md) — ad hoc customer-site deploys outside cx-environments-cd break later official-release upgrades; needs a sanctioned mechanism
