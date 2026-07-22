@@ -84,4 +84,17 @@ Turns out this role **doesn't exist today** for dark launches. There is no forma
 
 ### Technique 3: Assumption Reversal
 
-**SESSION PAUSED HERE — 2026-07-22.** Role Playing complete. Resume with Assumption Reversal — flip the root-cause assumptions (full-weight-only release process; no regression scoping; no approval/record mechanism) into concrete mechanism ideas tied to `cx-environments-cd` / `bump:<site>`.
+**Reversal 1 — "Every release must go through the full regression suite."**
+Component-level changes are usually deployable in isolation and are not too entangled — but cross-component regression risk can't be fully ruled out. Mitigation idea: scope regression to the changed component, paired with (a) notifying relevant domain owners it's happening, and (b) local-lab testing as a right-sized substitute for full regression rather than skipping validation altogether.
+
+**Reversal 2 — "A release must be publicly announced."**
+The announcement's real function isn't public disclosure — it's that RMT uses it to prepare accurate upgrade guides. When a dark launch isn't tracked, RMT builds the next upgrade guide against a baseline that's no longer true at that site, and the guide breaks in the field. So the announcement's job to preserve isn't "tell the world," it's "tell RMT so they build against actual state."
+
+**Reversal 3 — "`cx-environments-cd` only changes via the formal `bump:<site>` gate."**
+Key insight: **state capture and candidacy decision are two separate, parallel questions, not one sequential one.**
+- *State capture* (mandatory, immediate, regardless of outcome): the instant a dark launch happens, the site's actual deployed state has diverged from `cx-environments-cd` — that's true whether or not the fix is ever formalized. Upgrade-guide branching (customer A has the dark launch, customer B doesn't) already exists the moment the dark launch happens, not only if/when it's accepted as a release candidate.
+- *Candidacy decision* (separate, human judgment, can happen later): does this fix get folded into the next official release for everyone, or stay a permanent one-off for that site?
+- Humans cannot be relied on to manually record state capture in the heat of an urgent fix — it needs to be a side effect of the deploy mechanism itself, not a separate remembered step.
+- **Current constraint surfaced:** there is no single choke point today — dark launches are done ad hoc per engineer (no shared script/Helm command/CI job), so there's no natural place yet to attach automatic state capture.
+
+**SESSION PAUSED HERE — 2026-07-22.** Assumption Reversal's three reversals complete. Next: decide whether to keep generating (e.g., what a shared dark-launch choke point / state-capture mechanism could look like) or move to convergence/synthesis.
