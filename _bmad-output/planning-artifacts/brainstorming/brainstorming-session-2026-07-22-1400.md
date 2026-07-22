@@ -72,6 +72,16 @@ Purely time cost. The official patch path isn't distrusted, unknown, or hard to 
 **Persona 2 — Release Manager (Haroon/RMT)** (owns the full process, enforces full regression + announcement on every release including patches):
 Full regression is required on every release, including narrow single-customer patches, because RMT has **no way to scope regression down to just the affected component** — the tooling/process can only run the whole regression suite, not a targeted subset tied to blast radius.
 
-**Roles still to explore next session:** Customer, On-call/Go-No-Go approver, possibly stream-aligned dev who builds the iterative fix.
+**Persona 3 — Customer** (site receiving the urgent dark-launch fix):
+Wants the fix delivered as soon as possible — but equally wants assurance that a future official-release upgrade at their site won't corrupt or destroy the change the dark launch made. Speed now, no amnesia later: the fix needs to be durably represented somewhere the next official release respects, not silently lost.
 
-**SESSION PAUSED HERE — 2026-07-22.** Resume by continuing Role Playing (Customer and Approver personas), then proceed to Assumption Reversal.
+**Persona 4 — On-call/Go-No-Go Approver:**
+Turns out this role **doesn't exist today** for dark launches. There is no formal approval gate — the domain expert/engineer making the fix self-certifies that their own change is safe to deploy to the customer site. Nothing forces that knowledge to travel forward to whoever runs the next official upgrade at that site. The real gap isn't a missing checklist item at approval time — it's the **missing handoff artifact**: nothing captures "this was dark-launched, here's what changed" in a form the next release cycle can see and reconcile against.
+
+**Note:** The "stream-aligned dev who builds the iterative fix" persona is the same domain engineer already covered in Persona 1 — no separate perspective needed.
+
+**Role Playing wrap-up:** Four perspectives converge on one shape: speed-vs-process tension (Engineer/Customer) is real but solvable if regression could scope to blast radius (RM) — and the actual structural hole is the absence of any approval/record mechanism (Approver) that would let a dark launch's state travel forward instead of silently drifting from `cx-environments-cd`.
+
+### Technique 3: Assumption Reversal
+
+**SESSION PAUSED HERE — 2026-07-22.** Role Playing complete. Resume with Assumption Reversal — flip the root-cause assumptions (full-weight-only release process; no regression scoping; no approval/record mechanism) into concrete mechanism ideas tied to `cx-environments-cd` / `bump:<site>`.
