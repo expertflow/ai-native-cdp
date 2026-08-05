@@ -394,9 +394,20 @@ notify:rmt:
       fi
 ```
 
+**Addendum (2026-08-05) — this requirement is correct but conditional on rollback existing, and rollback is on hold.** `allow_failure: false` matters *because* `rollback`'s `when: on_failure` needs a real failure to react to. With rollback deferred, nothing consumes that signal: blocking would buy nothing and would break `notify`'s `when: on_success`, which fires only because failures are tolerated on the test job. **As shipped, `test:<site>` keeps `allow_failure: true`.** Accepted cost: the pipeline shows green when tests failed; the Google Chat card carries the real outcome. **When rollback lands, flip `allow_failure` to `false` AND `notify` to `when: always` in the same change — either alone is broken.**
+
+Two further corrections to the sketch above, both real:
+
+- **`notify` must not `needs:` the test job the way this sketch does.** A failed deploy skips `test`, and a skipped dependency skips the dependent job — so the sketch silently swallows exactly the outcome most worth reporting. As shipped, the deploy-failure card is posted from `.deploy_env`'s own `after_script` instead, which needs no report parsing (just site, job, pipeline) and removes the dependency on GitLab's `when: always`-over-a-skipped-`needs:` behaviour entirely.
+- **`needs:` must not point at a job that was never created.** `test:<site>` needs `deploy:<site>`, so both must be created in exactly the same pipelines or the pipeline fails to generate. As shipped, a `.chain_rules` anchor mirrors `.team_rules`' conditions without the manual gate.
+
+Also note **`RUN_REGRESSION` (§4.1's per-site opt-in flag) was dropped, not implemented.** `rules:` are evaluated at pipeline-creation time, before `environment:` is known, so an environment-scoped variable cannot gate a job via `rules: if:`. A site opts in by having a `test:<site>` job at all — visible in the pipeline graph, and no trap. (`BASE_URL` and the agent credentials *can* be environment-scoped, because they're read at runtime inside `script:`.)
+
 ### 4.4 Prerequisite: fix test flakiness before wiring auto-rollback
 
 Per `current-cicd-test-automation-maturity-audit.md`: file-wide serial mode (one suite's failure cascades into 9 "not run" results), `networkidle` waits against a websocket app, hardcoded per-suite phone numbers with no run isolation. If `rollback` is wired to fire automatically while these are unresolved, **a flaky test will trigger a real production rollback**. Land the maturity audit's remediation items (now tracked as CRM-777/778) **before** enabling auto-rollback for RMT. Until then, keep rollback's trigger `when: manual`.
+
+**Status confirmed (2026-08-05):** CRM-777 is still open, and the code agrees — `test.describe.configure({ mode: 'serial' })` remains at `CX-Chat-Cases.spec.js:3`, with 3 `networkidle` waits and 2 `waitForTimeout` sleeps. A real report in the working tree shows the cascade for what it is: `expected:0, unexpected:1, skipped:9` — one failure took out nine suites. That single flake would have reverted a whole site under auto-rollback. **CRM-778 is marked Resolved in Jira, but 50 empty `test.step('CIM-…', async () => {})` stubs remain at the branch tip — worth verifying with Umar Ikhlaq.** When auto-rollback is eventually wired, the better stepping stone than flipping the whole low-signal suite to blocking is to gate it on a narrow, high-signal smoke run (`npm run test:smoke`, already in `package.json`) while the full regression stays advisory.
 
 ---
 
@@ -415,6 +426,20 @@ Today, the same "clone Playwright repo, `npm ci`, run tests" logic exists in two
 - **Respects "environments are independent"** — `RUN_REGRESSION` is a per-site opt-in flag.
 
 **One genuine tradeoff, named plainly:** with `trigger:`, a run would show up as its own pipeline record inside `playwright-automation-script`'s history. With `include:`, it doesn't. Not treated as a loss — the meaningful unit of work is "did this deploy succeed" — but a real behavioral difference worth knowing.
+
+---
+
+### 5.1 Correction (2026-08-05): `include:` was rejected on implementation, and this section's premise was wrong
+
+**The premise above is factually incorrect.** It claims the clone-and-run logic "exists in two places: `playwright-automation-script`'s own pipeline and `CX-5.4.0`'s dormant `regression-test` job." The QA repo's pipeline **clones nothing** — it runs in its own checkout. There has only ever been *one* clone-and-run implementation, and moving it to `cx-environments-cd` keeps it at one. The duplication `include:` was meant to prevent does not exist.
+
+**The decisive fact: `include:` ships YAML and never files.** The test job runs in `cx-environments-cd`'s checkout, which has no spec, no `playwright.config.js`, no `package.json` — so the included template would *still* have to `git clone` the suite at runtime. `include:` changes nothing about what happens at run time; it only moves where the job-definition text lives. The bullets above ("artifacts land locally", "one place to look") are true of the direct move as well.
+
+**What it would have cost:** a `.gitlab-ci-template.yml` in the QA repo that doesn't exist — needed *only because* of `include:`, since pointing at that repo's own `.gitlab-ci.yml` would drag in its `stages:` and its two concrete jobs — plus a hard coupling of **deploy availability to QA repo hygiene**: `include:` is resolved while GitLab assembles the pipeline config, so an unresolvable ref means the whole pipeline fails to *generate*, `deploy:<site>` included. QA plans to merge and delete `feature/ci-playwright-config`, which makes that a live scenario rather than a hypothetical.
+
+**Two refs were also being conflated.** `include: ref:` pins the job-definition YAML and is resolved once, globally, before any job (and therefore any `environment:`) exists — it genuinely cannot be environment-scoped. The *test-suite* ref is a separate runtime `git clone --branch $PLAYWRIGHT_REF` and is fully per-job and environment-scopable. CRM-768's own acceptance criteria ("rename `PLAYWRIGHT_BRANCH` → `PLAYWRIGHT_REF`") are about that runtime variable. With `include:` dropped there is only one ref, and per-site divergence costs nothing.
+
+**Still true and unchanged:** test/notify belong in `cx-environments-cd` (§4.2), `playwright-automation-script` needs no changes to *run* (its notify script was edited only to fix a real counting bug), and `trigger:` remains the wrong tool. The QA repo's own pipeline is a deliberate harness for validating changes to these jobs without running the whole CD chain — it is not part of the CD pipeline and must not be included from it.
 
 ---
 
@@ -437,12 +462,14 @@ Ordered by dependency — the state-writing side first, then the stages that con
 - Add site-level `pre-deploy`/`post-deploy` stages (§3.6) — the consumers of bump's copied files; this is where transflux's runtime config (tenants.yaml ConfigMap, dbt_schema — §2.4) finally gets mounted, closing the known "chart deploys but comes up unconfigured" gap from CRM-783
 - Add tenant-level `pre-deploy-tenant`/`deploy-tenant` for every site (§2.2, §3.6) — per-tenant namespace creation, cross-namespace secret/cert copies, MTT-single deployment
 - Re-enable and clean up `cim-solution`'s `detect/build/publish` stages (the factory move), confirming `transflux`'s moved config/`dbt_schema` (§2.4) is included in what gets versioned/published — and re-applying the Maintainer gate (§3.7) in `cim-solution` when the buttons move there
-- Add `include: project:` + `test:<site>` jobs, starting with RMT
-- Confirm `allow_failure` is **not** `true` on the test job (§4.3)
-- Add `rollback:<site>` — start with `when: manual` until Phase 3 lands; must revert declared state (pins + files, `[skip ci]`) as well as the cluster (§3.6 item 6), and reset the marker
-- Add `notify:<site>` aggregating deploy+test+rollback status
-- Remove `regression-test`/`notify-google-chat` from `CX-5.4.0/.gitlab-ci.yml`
+- ~~Add `include: project:` + `test:<site>` jobs, starting with RMT~~ **Done (2026-08-05), but WITHOUT `include:` — see §5's correction.** `test:<site>` and `notify:<site>` now live in `cx-environments-cd` (commit `5518d31` on `CRM-782-sites-tenants-restructure`, MR !1), lifted from `cim-solution`'s proven `regression-test`/`notify-google-chat` pair. One hidden `.regression_test`/`.notify_chat` each, with three-line per-site jobs for **both** devops and rmt. `PLAYWRIGHT_REF` pins a branch (`feature/ci-playwright-config`), not a tag — the QA repo still has no tags (CRM-768 open) and its `main`/`CX5.7.0` carry only the `.spec.js`, no `package.json` or config, so neither can run.
+- ~~Confirm `allow_failure` is **not** `true` on the test job (§4.3)~~ **Deliberately inverted while rollback is deferred — see §4.3's addendum.** `allow_failure: true` stays for now.
+- **Add `rollback:<site>` — ON HOLD (stakeholder call, 2026-08-05).** Test + notify shipped first; rollback deferred as a separate piece of work. Design work already done and parked in `.ai/memory/project-cicd-test-notify-rollback-design.md`: rollback granularity is *forced* to equal deploy granularity (whole-site until the §3.6 item 5 marker lands), and the mechanism must snapshot each release's revision *before* deploying rather than relying on a bare `helm rollback` — "back one revision" overshoots when the inline per-chart rollback already fired, and fails outright on a first install (REVISION 1), which is the live chart-onboarding path. Git state-revert must be path-scoped to `sites/<site>/`, since one commit can touch two sites.
+- ~~Add `notify:<site>` aggregating deploy+test+rollback status~~ **Done (2026-08-05)** — aggregates deploy + test (rollback deferred). Because a failed deploy skips `test` and therefore `notify`, `.deploy_env` gained an `after_script` that posts a minimal failure card directly, so the outcome the team most needs to hear is never silent.
+- Remove `regression-test`/`notify-google-chat` from `CX-5.4.0/.gitlab-ci.yml` — **pending: leave in place until the new jobs run green**, so the only working reference isn't deleted before its replacement is proven.
 - (§3.3 chart-override metadata generalization stays deferred)
+
+**Blocking a green run (2026-08-05), both outside the pipeline itself:** `qa/playwright-automation-script` must list `cx-environments-cd` in its CI job-token allowlist (`cim-solution` being allowed proves nothing — different project), and the per-site `BASE_URL` / `AGENT1_*` / `AGENT2_*` / `GOOGLE_CHAT_WEBHOOK` variables must be created in `cx-environments-cd`. `BASE_URL` holds a **tenant** URL (e.g. `https://mtt02.expertflow.com`) — the suite drives agent-desk chat flows, which are tenant-scoped, so each site names the tenant it wants exercised. Neither site can run the suite green yet (devops incompletely configured; RMT not yet wired to its cluster), which is a further reason `allow_failure: true` matters today. **Junaid is integrating the pipeline with the RMT cloud VM**; the deployment documentation has been shared with him.
 
 ### Phase 3 — Test-suite hardening (prerequisite to auto-rollback)
 - Remove file-wide serial mode cascade, kill top flake sources, restore coverage integrity (CRM-777/778)
