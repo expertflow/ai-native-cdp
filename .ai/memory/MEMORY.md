@@ -15,3 +15,5 @@
 - [CD: Deployment Guide Cross-check](project-cicd-deployment-guide-crosscheck.md) — found real namespace/release-name bugs (agent-desk wrong whole test phase) vs the 5.6.0 guide; Phase 1 scope now excludes externals+Vault, devops/rmt apps.yaml edited to match (commit def3e1d, unpushed)
 - [CD: Confluence Docs Published](project-cicd-confluence-docs-published.md) — 7-page doc tree live under EF's CI/CD Guidelines; DTDO's old POC guide deliberately left untouched; no attachment-upload tool available this session
 - [CD: Test/Notify Integration Design](project-cicd-test-notify-rollback-design.md) — settled, not yet built: move CX-5.4.0's proven test+notify jobs into cx-environments-cd; `include:` rejected (zero functional benefit — the job clones either way); rollback on hold; allow_failure stays true
+- [CRM-763 Bundle](project-cicd-crm-763-bundle.md) — Haroon committed CRM-782 + CRM-783 complete together with parent CRM-763, one delivery unit not staggered tasks
+- [Dark Launch Drift](project-cicd-dark-launch-drift.md) — ad hoc customer-site deploys outside cx-environments-cd break later official-release upgrades; needs a sanctioned mechanism
