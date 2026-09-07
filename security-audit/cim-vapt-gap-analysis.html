@@ -1,0 +1,616 @@
+<title>CIM VAPT Gap Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=Literata:opsz,wght@7..72,400..600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  --bg:#EDEFF2;
+  --surface:#FCFCFD;
+  --surface-2:#E4E8ED;
+  --ink:#15181C;
+  --ink-2:#4B545F;
+  --ink-3:#727C88;
+  --rule:#D3D9E0;
+  --rule-2:#BFC7D1;
+  --navy:#1E3A54;
+  --navy-soft:#41627F;
+  --crit:#A82015;
+  --crit-bg:#F7E2DF;
+  --warn:#8A5A00;
+  --warn-bg:#F6EBD6;
+  --ok:#2A6349;
+  --ok-bg:#DFEBE4;
+  --shadow:0 1px 2px rgba(21,24,28,.06), 0 8px 24px -18px rgba(21,24,28,.4);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14171B;
+    --surface:#1B1F25;
+    --surface-2:#232830;
+    --ink:#E9ECF0;
+    --ink-2:#A6B0BC;
+    --ink-3:#7C8794;
+    --rule:#2C333B;
+    --rule-2:#3B444E;
+    --navy:#9FC0DC;
+    --navy-soft:#7FA1BD;
+    --crit:#FF7A6B;
+    --crit-bg:#3A1E1A;
+    --warn:#E3AA4E;
+    --warn-bg:#332915;
+    --ok:#79C9A0;
+    --ok-bg:#172C23;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -18px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14171B;
+  --surface:#1B1F25;
+  --surface-2:#232830;
+  --ink:#E9ECF0;
+  --ink-2:#A6B0BC;
+  --ink-3:#7C8794;
+  --rule:#2C333B;
+  --rule-2:#3B444E;
+  --navy:#9FC0DC;
+  --navy-soft:#7FA1BD;
+  --crit:#FF7A6B;
+  --crit-bg:#3A1E1A;
+  --warn:#E3AA4E;
+  --warn-bg:#332915;
+  --ok:#79C9A0;
+  --ok-bg:#172C23;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -18px rgba(0,0,0,.9);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"Literata",Georgia,"Times New Roman",serif;
+  font-optical-sizing:auto;
+  font-size:16.5px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1020px;margin:0 auto;padding:0 28px 96px}
+
+h1,h2,h3,.eyebrow,.sig,.tile-n,.chip,th{
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+  font-variation-settings:"wdth" 112;
+}
+code,kbd,.mono{font-family:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace}
+code{
+  font-size:.855em;
+  background:var(--surface-2);
+  border:1px solid var(--rule);
+  border-radius:3px;
+  padding:.08em .34em;
+  color:var(--ink);
+  word-break:break-word;
+}
+
+/* ---------- masthead ---------- */
+.mast{padding:52px 0 0}
+.eyebrow{
+  font-size:11.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--navy-soft);font-variation-settings:"wdth" 100;
+  display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+}
+.eyebrow span::after{content:"";display:inline-block;width:3px;height:3px;border-radius:50%;
+  background:var(--rule-2);margin-left:10px;vertical-align:middle}
+.eyebrow span:last-child::after{display:none}
+h1{
+  font-size:clamp(38px,6.4vw,66px);
+  font-weight:800;
+  font-variation-settings:"wdth" 118;
+  letter-spacing:-.022em;
+  line-height:1.02;
+  margin:.32em 0 0;
+  text-wrap:balance;
+}
+.standfirst{
+  font-size:clamp(18px,2.2vw,21.5px);
+  line-height:1.5;
+  color:var(--ink-2);
+  max-width:60ch;
+  margin:22px 0 0;
+}
+.standfirst strong{color:var(--ink);font-weight:600}
+.metabar{
+  margin-top:30px;padding-top:16px;border-top:2px solid var(--ink);
+  display:flex;flex-wrap:wrap;gap:26px;
+  font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-3);
+}
+.metabar b{color:var(--ink-2);font-weight:600}
+
+/* ---------- verdict instrument ---------- */
+.verdict{margin-top:44px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(206px,1fr));gap:1px;
+  background:var(--rule);border:1px solid var(--rule);border-radius:5px;overflow:hidden}
+.tile{background:var(--surface);padding:20px 22px 18px;display:flex;flex-direction:column;gap:5px}
+.tile-n{font-size:40px;font-weight:800;line-height:1;letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;font-variation-settings:"wdth" 108}
+.tile-n.bad{color:var(--crit)}
+.tile-l{font-family:"Archivo",sans-serif;font-size:12px;font-weight:600;letter-spacing:.075em;
+  text-transform:uppercase;color:var(--ink-2);font-variation-settings:"wdth" 100}
+.tile-s{font-size:13.5px;line-height:1.4;color:var(--ink-3)}
+
+.gauge{margin-top:26px;background:var(--surface);border:1px solid var(--rule);
+  border-radius:5px;padding:22px 24px 20px;box-shadow:var(--shadow)}
+.gauge h3{font-size:13px;font-weight:700;letter-spacing:.075em;text-transform:uppercase;
+  margin:0 0 3px;color:var(--ink);font-variation-settings:"wdth" 100}
+.gauge p.cap{margin:0 0 16px;font-size:13.5px;color:var(--ink-3)}
+.bar{display:flex;height:34px;border-radius:3px;overflow:hidden;border:1px solid var(--rule-2)}
+.seg{display:flex;align-items:center;justify-content:center;
+  font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;
+  color:var(--surface);min-width:0}
+.seg.f{background:var(--crit);flex:59}
+.seg.m{background:var(--warn);flex:4}
+.seg.s{background:var(--ok);flex:8}
+.key{display:flex;flex-wrap:wrap;gap:20px;margin-top:12px;
+  font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-2)}
+.key i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px}
+.key i.f{background:var(--crit)} .key i.m{background:var(--warn)} .key i.s{background:var(--ok)}
+
+/* ---------- sections ---------- */
+.sec{margin-top:60px;scroll-margin-top:20px}
+.sec-head{display:flex;align-items:baseline;gap:14px;
+  border-bottom:2px solid var(--ink);padding-bottom:9px;margin-bottom:8px}
+.sec-key{font-family:"Archivo",sans-serif;font-size:30px;font-weight:800;line-height:1;
+  color:var(--navy);font-variation-settings:"wdth" 118;letter-spacing:-.02em}
+h2{font-size:22px;font-weight:700;letter-spacing:-.012em;margin:0;flex:1;
+  font-variation-settings:"wdth" 110}
+.sec-count{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+.sec-intro{color:var(--ink-2);font-size:15.5px;margin:14px 0 26px;max-width:66ch}
+
+.finding{
+  background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--rule-2);
+  border-radius:4px;padding:18px 22px 19px;margin-bottom:14px;
+}
+.finding.p-crit{border-left-color:var(--crit)}
+.finding.p-high{border-left-color:var(--warn)}
+.finding.p-med{border-left-color:var(--navy-soft)}
+.f-top{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:9px}
+.sig{font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;
+  color:var(--surface);background:var(--navy);border-radius:3px;padding:2px 7px;letter-spacing:.02em}
+.finding.p-crit .sig{background:var(--crit)}
+.finding.p-high .sig{background:var(--warn)}
+h3{font-size:17px;font-weight:700;margin:0;letter-spacing:-.008em;flex:1;min-width:min(100%,320px);
+  font-variation-settings:"wdth" 108}
+.chip{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  padding:3px 8px;border-radius:99px;white-space:nowrap;font-variation-settings:"wdth" 100}
+.chip.crit{background:var(--crit-bg);color:var(--crit)}
+.chip.high{background:var(--warn-bg);color:var(--warn)}
+.chip.med{background:var(--surface-2);color:var(--ink-2)}
+.finding p{margin:0 0 9px;font-size:15.5px;line-height:1.58}
+.finding p:last-child{margin-bottom:0}
+.claim{
+  border-left:2px solid var(--rule-2);padding:2px 0 2px 14px;margin:12px 0;
+  font-size:14.5px;color:var(--ink-2);font-style:italic;
+}
+.claim b{font-style:normal;font-weight:600;color:var(--ink-3);
+  font-family:"Archivo",sans-serif;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;display:block;margin-bottom:3px;font-variation-settings:"wdth" 100}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow-x:auto;margin:16px 0 4px;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{
+  text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-2);padding:11px 16px;border-bottom:1px solid var(--rule-2);
+  background:var(--surface-2);white-space:nowrap;font-variation-settings:"wdth" 100;
+}
+td{padding:9px 16px;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.n{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+td.repo{font-family:"JetBrains Mono",monospace;font-size:12.5px;white-space:nowrap}
+td.date{font-family:"JetBrains Mono",monospace;font-size:12.5px;color:var(--ink-3);white-space:nowrap}
+td.note{color:var(--ink-2);font-size:14px}
+tr.bad td.n{color:var(--crit);font-weight:600}
+
+/* ---------- remediation ---------- */
+.rem{margin-top:16px}
+.rem-band{
+  display:grid;grid-template-columns:auto 1fr;gap:0 22px;
+  border-top:1px solid var(--rule-2);padding:22px 0 4px;
+}
+.rem-tag{font-family:"Archivo",sans-serif;font-weight:800;font-size:15px;letter-spacing:.03em;
+  color:var(--navy);white-space:nowrap;font-variation-settings:"wdth" 115}
+.rem-tag small{display:block;font-weight:600;font-size:10.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:3px;font-variation-settings:"wdth" 100}
+.rem-band.p0 .rem-tag{color:var(--crit)}
+ol.steps{margin:0;padding-left:20px}
+ol.steps li{margin-bottom:9px;font-size:15.5px}
+ol.steps li:last-child{margin-bottom:0}
+.warnbox{
+  background:var(--crit-bg);border:1px solid var(--crit);border-radius:4px;
+  padding:14px 18px;margin:14px 0 4px;font-size:14.5px;color:var(--ink);
+}
+.warnbox b{font-weight:600}
+
+/* ---------- verify ---------- */
+.verify{margin-top:14px;display:grid;gap:12px}
+.vrow{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:14px 18px}
+.vrow h4{font-family:"Archivo",sans-serif;font-size:12px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;margin:0 0 7px;color:var(--ink-2);font-variation-settings:"wdth" 100}
+.vrow code{display:block;background:transparent;border:none;padding:0;font-size:12.5px;
+  color:var(--navy);line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.vrow p{margin:0;font-size:14.5px;color:var(--ink-2)}
+
+footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule-2);
+  font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-3);line-height:1.75}
+
+@media (max-width:640px){
+  .wrap{padding:0 18px 64px}
+  .rem-band{grid-template-columns:1fr;gap:10px}
+  .sec-head{flex-wrap:wrap}
+}
+@media (prefers-reduced-motion:no-preference){
+  .seg{transition:none}
+}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow">
+    <span>Expertflow</span><span>CIM group</span><span>gitlab.expertflow.com</span><span>Internal</span>
+  </div>
+  <h1>CIM VAPT Gap Analysis</h1>
+  <p class="standfirst">The VAPT Process draft describes a permanent security gate on every merge request. In the CIM group that gate <strong>does not exist</strong>. The scans run, they fail on real vulnerabilities, and the merges go through anyway.</p>
+  <div class="metabar">
+    <div><b>Audited</b> 3 Sep 2026</div>
+    <div><b>Source</b> VAPT Process - Draft.md</div>
+    <div><b>Scope</b> 109 projects, group id 50</div>
+    <div><b>Evidence</b> 267 MRs since 1 Jun 2026</div>
+  </div>
+</header>
+
+<section class="verdict">
+  <div class="tiles">
+    <div class="tile">
+      <div class="tile-n bad">0</div>
+      <div class="tile-l">Repos with a merge gate</div>
+      <div class="tile-s">Of 53 with CI. <code>only_allow_merge_if_pipeline_succeeds</code> is false everywhere, with zero approval rules.</div>
+    </div>
+    <div class="tile">
+      <div class="tile-n bad">56</div>
+      <div class="tile-l">Projects with no CI at all</div>
+      <div class="tile-s">Of 109. Seventeen of them are actively developed and are not test doubles.</div>
+    </div>
+    <div class="tile">
+      <div class="tile-n bad">0</div>
+      <div class="tile-l">Release images scanned</div>
+      <div class="tile-s">The tag pipeline has no scan stage. Only throwaway MR build images are ever scanned.</div>
+    </div>
+    <div class="tile">
+      <div class="tile-n bad">1<span style="font-size:22px"> hr</span></div>
+      <div class="tile-l">Scan evidence retention</div>
+      <div class="tile-s">Artifacts expire about an hour after the job. The audit trail is already gone.</div>
+    </div>
+  </div>
+
+  <div class="gauge">
+    <h3>Head pipeline status at the moment of merge</h3>
+    <p class="cap">71 merged MRs inspected job by job, the two most recent per active repo, since 1 June 2026.</p>
+    <div class="bar" role="img" aria-label="59 of 71 merged MRs had a failed pipeline, 4 manual or skipped, 8 successful">
+      <div class="seg f">59 failed</div>
+      <div class="seg m">4</div>
+      <div class="seg s">8 green</div>
+    </div>
+    <div class="key">
+      <div><i class="f"></i>Failed, merged anyway</div>
+      <div><i class="m"></i>Manual or skipped, never completed</div>
+      <div><i class="s"></i>Passed</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= A ================= -->
+<section class="sec" id="a">
+  <div class="sec-head">
+    <div class="sec-key">A</div>
+    <h2>Enforcement: the gate does not exist</h2>
+    <div class="sec-count">5 gaps</div>
+  </div>
+  <p class="sec-intro">The scan jobs are correctly written and they genuinely fail on vulnerabilities. Nothing downstream acts on that failure.</p>
+
+  <article class="finding p-crit">
+    <div class="f-top"><span class="sig">A1</span><h3>No merge gate is configured in any repo</h3><span class="chip crit">Critical</span></div>
+    <p><code>only_allow_merge_if_pipeline_succeeds = false</code> in all 53 CIM repos that have CI. <code>approvals_before_merge = 0</code> and zero approval rules in all 53. Protected branches (<code>master</code>, <code>develop</code>, <code>main</code>) let Maintainers merge with no pipeline condition and no code-owner approval.</p>
+    <p>In nearly all 59 failures above, the failing job is <code>trivy_scanning_merge</code> with <code>allow_failure=false</code>. Job traces confirm real vulnerability exits from <code>trivy --exit-code 1 --severity HIGH --ignore-unfixed</code>, not infrastructure flakes.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Merge request</th><th>Merged</th><th>Pipeline</th><th>Failing scan job</th></tr></thead>
+        <tbody>
+          <tr class="bad"><td class="repo">cim/cim-backend!93</td><td class="date">2026-09-01</td><td class="n">failed</td><td class="repo">trivy + grype</td></tr>
+          <tr class="bad"><td class="repo">cim/media-routing-engine!277</td><td class="date">2026-09-02</td><td class="n">failed</td><td class="repo">trivy + grype</td></tr>
+          <tr class="bad"><td class="repo">cim/campaigns!51</td><td class="date">2026-08-21</td><td class="n">failed</td><td class="repo">trivy + sonarqube</td></tr>
+          <tr class="bad"><td class="repo">cim/unified-agent!454</td><td class="date">2026-09-01</td><td class="n">failed</td><td class="repo">trivy + grype</td></tr>
+          <tr class="bad"><td class="repo">cim/realtime-reports-manager!224</td><td class="date">2026-09-02</td><td class="n">failed</td><td class="repo">trivy + grype</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="claim"><b>The draft says</b>Track 1 "is a permanent gate and runs for the entire lifetime of the product." Section 6: "MR scan failures block the merge automatically."</div>
+  </article>
+
+  <article class="finding p-crit">
+    <div class="f-top"><span class="sig">A2</span><h3>The MR Trivy template swallows every Critical finding</h3><span class="chip crit">Critical</span></div>
+    <p><code>ci-templates/trivy-merge.yaml</code> ends the CRITICAL check with a trailing <code>|| echo "The previous command has some errors..Continuing"</code>, so a Critical finding cannot fail the job. Only the HIGH check propagates its exit code. Even with A1 fixed, Criticals would still pass through.</p>
+    <div class="claim"><b>The draft says</b>"Critical and High findings with an available upstream fix block the merge."</div>
+  </article>
+
+  <article class="finding p-high">
+    <div class="f-top"><span class="sig">A3</span><h3>SonarQube is not the co-gate the draft claims</h3><span class="chip high">High</span></div>
+    <p>22 repos set <code>allow_failure: true</code> on the Sonar job. 8 repos have no Sonar job at all: <code>cim-rasa-bot</code>, <code>cim-solution</code>, <code>cim-solution-helm</code>, <code>cx-charts-cd</code>, <code>cx-data-platform</code>, <code>cx-environments-cd</code>, <code>efcx-compatibility</code>, <code>helm-connector</code>.</p>
+    <div class="claim"><b>The draft says</b>"This runs alongside the existing mvn-scan (SonarQube) gate, both must pass."</div>
+  </article>
+
+  <article class="finding p-med">
+    <div class="f-top"><span class="sig">A4</span><h3>Branch scans behave the opposite of the policy, inconsistently</h3><span class="chip med">Medium</span></div>
+    <p><code>.trivy_scan_template</code> sets <code>allow_failure: false</code> with <code>--exit-code 1</code>, so branch scans block. Then 13 repos override it back to <code>allow_failure: true</code> on the branch jobs, including <code>apple-store-connector</code>, <code>cx-data-platform</code>, <code>cx-load-hub</code>, <code>cx-tenant</code>, <code>google-playstore-connector</code>, <code>migration-utility</code>, <code>unified-admin</code>, <code>web-channel-manager</code>. Neither the template nor the repos match the policy, and the repos do not match each other.</p>
+    <div class="claim"><b>The draft says</b>"These are informational only, they do not block the pipeline."</div>
+  </article>
+
+  <article class="finding p-med">
+    <div class="f-top"><span class="sig">A5</span><h3>Maintainers can push straight to protected branches, bypassing the MR</h3><span class="chip med">Medium, latent</span></div>
+    <p>74 of the 75 protected branches in the group set <code>push_access_levels = Maintainers</code>. Only one is set to "No one". A Maintainer can push directly to <code>master</code>, <code>develop</code> or <code>main</code> without opening an MR, so no scan runs at all. <code>cim/cim-solution</code> extends this to its release branches <code>CX-5.10.0</code>, <code>CX-5.11.0</code> and <code>CX-5.12.0</code>.</p>
+    <p>Measured exploitation is currently low. Of 565 single-parent commits on protected default branches since 2026-06-01, 527 arrived through a merge request and 38 did not:</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Repo</th><th>Branch</th><th>Direct pushes</th></tr></thead>
+        <tbody>
+          <tr class="bad"><td class="repo">cim/cx-environments-cd</td><td class="date">main</td><td class="n">25</td></tr>
+          <tr class="bad"><td class="repo">cim/cx-charts-cd</td><td class="date">main</td><td class="n">12</td></tr>
+          <tr><td class="repo">cim/tylnex_sms_connector</td><td class="date">main</td><td class="n">1</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>This matters because 37 of the 38 are in the two CD repos, which have no scanning of any kind (B2) and determine what gets deployed. Fixing A1 without also fixing A5 leaves the bypass open for the day someone reaches for it.</p>
+    <p>Separately, <code>allow_merge_on_skipped_pipeline</code> is unset on 52 of 53 repos. When the gate is enabled it must be explicitly set to <code>false</code>, or the manual and skipped pipelines seen in the sample will count as passing.</p>
+  </article>
+</section>
+
+<!-- ================= B ================= -->
+<section class="sec" id="b">
+  <div class="sec-head">
+    <div class="sec-key">B</div>
+    <h2>Coverage: what is never scanned</h2>
+    <div class="sec-count">5 gaps</div>
+  </div>
+  <p class="sec-intro">Roughly half the group has no pipeline, and the half that does never scans the artifact that actually ships.</p>
+
+  <article class="finding p-crit">
+    <div class="f-top"><span class="sig">B1</span><h3>56 of 109 projects have no <code>.gitlab-ci.yml</code> on their default branch</h3><span class="chip crit">Critical</span></div>
+    <p>Empty repos, QA automation and the <code>load-test/*</code> mocks are fairly excluded. These 17 are actively developed and are not test doubles.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Project</th><th>Last activity</th><th>State</th></tr></thead>
+        <tbody>
+          <tr><td class="repo">cim/case-management</td><td class="date">2026-09-02</td><td class="note">CI exists only on feature branch <code>1.0-f_CIM-33658</code></td></tr>
+          <tr><td class="repo">cim/transflux</td><td class="date">2026-09-01</td><td class="note">10 branches, no CI on any of them</td></tr>
+          <tr><td class="repo">cim/amq-auth-plugin</td><td class="date">2026-08-13</td><td class="note">42 branches, no CI</td></tr>
+          <tr><td class="repo">cim/cisco-teams-synchronizer</td><td class="date">2026-06-19</td><td class="note">CI only on a feature branch</td></tr>
+          <tr><td class="repo">cim/tenant-management-portal</td><td class="date">2026-05-11</td><td class="note">CI only on a feature branch</td></tr>
+          <tr><td class="repo">cim/tenant-config-service</td><td class="date">2026-04-09</td><td class="note">No CI</td></tr>
+          <tr><td class="repo">cim/bs4</td><td class="date">2026-03-10</td><td class="note">No CI</td></tr>
+          <tr><td class="repo">cim/workflow-builder/node-red-auth-keycloak</td><td class="date">2026-02-10</td><td class="note">No CI</td></tr>
+          <tr><td class="repo">cim/workflow-builder/node-red-context-redis</td><td class="date">2025-12-23</td><td class="note">No CI</td></tr>
+          <tr><td class="repo">cim/workflow-builder/node-red-resilient-hooks</td><td class="date">2025-12-23</td><td class="note">No CI</td></tr>
+          <tr><td class="repo">cim/workflow-builder/message-preprocessor</td><td class="date">2025-12-23</td><td class="note">CI only on a feature branch</td></tr>
+          <tr><td class="repo">cim/frontend-logger</td><td class="date">2025-12-04</td><td class="note">CI only on a feature branch</td></tr>
+          <tr><td class="repo">cim/web-form</td><td class="date">2025-08-25</td><td class="note">No CI</td></tr>
+          <tr><td class="repo">cim/customer-attributes-microfrontend</td><td class="date">2025-08-20</td><td class="note">No CI</td></tr>
+          <tr><td class="repo">cim/cx-historical-dashboards</td><td class="date">2025-07-15</td><td class="note">No CI</td></tr>
+          <tr><td class="repo">cim/cim-reports</td><td class="date">2025-07-14</td><td class="note">No CI</td></tr>
+          <tr><td class="repo">cim/list-management</td><td class="date">2025-06-10</td><td class="note">CI only on a feature branch</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The "CI only on a feature branch" cases are worse than they look. The default branch has no pipeline at all, so nothing scans the branch the release is cut from. Separately, <code>twitter_mock_server</code> and <code>apple-store-mock-server</code> ship Dockerfiles with no CI and should be explicitly declared in or out of scope.</p>
+  </article>
+
+  <article class="finding p-crit">
+    <div class="f-top"><span class="sig">B5</span><h3>The released artifact is never scanned</h3><span class="chip crit">Critical</span></div>
+    <p><code>gitlab_publish</code> runs <code>only: tags</code>, and there is no scan job on the tag pipeline. Track 1 scans a throwaway MR build image and never the tagged release image that ships to customers. There is also no post-merge pipeline on <code>main</code> or <code>master</code>.</p>
+    <p>This leaves the release triage snapshot, which the draft calls "the definitive finding list for the release", with no pipeline-produced input for the actual RC artifact.</p>
+  </article>
+
+  <article class="finding p-high">
+    <div class="f-top"><span class="sig">B2</span><h3>Six repos have CI but no Trivy or Grype</h3><span class="chip high">High</span></div>
+    <p><code>cim-solution</code>, <code>cim-solution-helm</code>, <code>cx-charts-cd</code>, <code>cx-environments-cd</code>, <code>efcx-compatibility</code>, <code>helm-connector</code>. <code>cim/cim-solution</code> is the single most active repo in the group and is the one that defines what actually gets deployed. Nothing in either track covers Helm charts, Kubernetes manifests, or IaC.</p>
+  </article>
+
+  <article class="finding p-high">
+    <div class="f-top"><span class="sig">B4</span><h3>Branch scans usually never run at all</h3><span class="chip high">High</span></div>
+    <p>In 35 of 53 repos <code>gitlab_build_branch</code> is <code>when: manual</code>, and the scan jobs declare <code>needs: [gitlab_build_branch]</code>. No manual click means no image, which means no scan. The shift-left claim in the draft's closing summary does not hold in practice.</p>
+  </article>
+
+  <article class="finding p-med">
+    <div class="f-top"><span class="sig">B3</span><h3>Branch scans exclude <code>master</code> and <code>develop</code> in 43 of 53 repos</h3><span class="chip med">Medium</span></div>
+    <p>The scan jobs use <code>only: [/^.+_f-.+$/, /^.+_b-.+$/]</code>, so only feature and bug branches match.</p>
+    <div class="claim"><b>The draft says</b>"Branch scans run on every commit to master, develop, feature branches and bug branches."</div>
+  </article>
+</section>
+
+<!-- ================= C ================= -->
+<section class="sec" id="c">
+  <div class="sec-head">
+    <div class="sec-key">C</div>
+    <h2>Scanner scope and supply chain</h2>
+    <div class="sec-count">5 gaps</div>
+  </div>
+  <p class="sec-intro">The controls themselves carry risk, and one policy flag makes an entire severity class invisible.</p>
+
+  <article class="finding p-high">
+    <div class="f-top"><span class="sig">C2</span><h3><code>--ignore-unfixed</code> makes the whole P4 class unobservable</h3><span class="chip high">High</span></div>
+    <p>Every blocking Trivy invocation uses <code>--ignore-unfixed</code>. Section 4 defines P4 as "Low findings, <em>or any severity with no upstream fix available</em>", and the exception process requires documenting upstream fix status. Nothing in CI produces that list, so both the P4 category and the no-fix exception path have no data source at all.</p>
+  </article>
+
+  <article class="finding p-high">
+    <div class="f-top"><span class="sig">C3</span><h3>Grype is piped unpinned from GitHub at job runtime</h3><span class="chip high">High</span></div>
+    <p><code>curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh</code>, from <code>main</code>, executed inside the pipeline. Unpinned, network dependent, and a supply-chain exposure inside the security control itself. It also fails in the wrong direction: <code>--fail-on critical</code> only, so Grype ignores High entirely.</p>
+  </article>
+
+  <article class="finding p-high">
+    <div class="f-top"><span class="sig">C1</span><h3>Container image scanning is the only source of findings</h3><span class="chip high">High</span></div>
+    <p>No SCA against source manifests (<code>pom.xml</code>, <code>package.json</code>), no secret scanning anywhere in the group, no SAST beyond SonarQube, no IaC or misconfiguration scanning, no SBOM, no DAST. Leaked credentials in Git history are covered by neither track.</p>
+  </article>
+
+  <article class="finding p-med">
+    <div class="f-top"><span class="sig">C5</span><h3>All 47 repos include <code>ci-templates</code> at a mutable ref</h3><span class="chip med">Medium</span></div>
+    <p><code>ref: 'main'</code>. Any edit to <code>trivy-merge.yaml</code> instantly changes the security posture of every pipeline in the group with no review, no version pin, and no record of which template version produced a given result. For an ISO 27001 control this is a change-management gap as much as a technical one.</p>
+  </article>
+
+  <article class="finding p-med">
+    <div class="f-top"><span class="sig">C4</span><h3>Trivy version drift between the two templates</h3><span class="chip med">Medium</span></div>
+    <p><code>trivy.yaml</code> pins <code>0.64.0</code>, <code>trivy-merge.yaml</code> pins <code>0.63.0</code>, and <code>--offline-scan</code> is set on branch scans only. Branch and MR results are not comparable.</p>
+  </article>
+</section>
+
+<!-- ================= D ================= -->
+<section class="sec" id="d">
+  <div class="sec-head">
+    <div class="sec-key">D</div>
+    <h2>Evidence and audit trail</h2>
+    <div class="sec-count">3 gaps</div>
+  </div>
+  <p class="sec-intro">Section 7 promises SOC 2 and ISO 27001 retention. Nothing durable is being produced.</p>
+
+  <article class="finding p-crit">
+    <div class="f-top"><span class="sig">D1</span><h3>Scan artifacts expire about an hour after the job</h3><span class="chip crit">Critical</span></div>
+    <p>On <code>cim-backend</code> pipeline 66463, <code>trivy_scanning_merge</code> shows <code>artifacts_expire_at</code> roughly one hour after job start, and the only surviving file is <code>job.log</code>. The reports the job produced (<code>*-image-vulnerabilities-critical-trivy.txt</code>, <code>-high-trivy.txt</code>, <code>gl-container-scanning-report.json</code>) are already gone and return 404 on download.</p>
+  </article>
+
+  <article class="finding p-high">
+    <div class="f-top"><span class="sig">D2</span><h3>The container_scanning report upload goes nowhere</h3><span class="chip high">High</span></div>
+    <p>The instance is GitLab 17.4.2-ee, but <code>groups/50/vulnerability_findings</code> and <code>projects/:id/vulnerabilities</code> both return nothing, so the Security Dashboard is not available or not licensed. Section 7 requires per-component results "deduplicated by CVE ID, not raw Trivy row counts" across roughly 50 components. That can only be produced by hand today, from artifacts that have already expired.</p>
+  </article>
+
+  <article class="finding p-med">
+    <div class="f-top"><span class="sig">D3</span><h3>The release triage snapshot has no owner, location, format or tooling</h3><span class="chip med">Medium</span></div>
+    <p>The draft makes it the basis of the release gate and the definitive finding list for a release. Nothing produces it.</p>
+  </article>
+</section>
+
+<!-- ================= E ================= -->
+<section class="sec" id="e">
+  <div class="sec-head">
+    <div class="sec-key">E</div>
+    <h2>Gaps inside the document itself</h2>
+    <div class="sec-count">9 gaps</div>
+  </div>
+  <p class="sec-intro">Independent of the infrastructure, the draft contradicts itself in ways an auditor would find.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Ref</th><th>Gap</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td class="repo">E1</td><td class="note"><b>P1 and P2 share a 7-day deadline</b></td><td class="note">The split changes enforcement wording only, not urgency, which makes the CVSS classification work in Section 4 largely ceremonial. Section 6 then introduces a third timing pattern the Section 5 table never mentions.</td></tr>
+        <tr><td class="repo">E2</td><td class="note"><b>Three escalation authorities, two day counts</b></td><td class="note">Section 5 says Day 8 to Component Lead and RM, Day 12 to Higher Management with CTO risk acceptance. The closing summary says VP Engineering is accountable beyond Day 10. Section 4 says the Security PO signs. Pick one.</td></tr>
+        <tr><td class="repo">E3</td><td class="note"><b>The RACI is incomplete</b></td><td class="note">No row for release triage, monthly production scans, or risk acceptance. No column for VP Engineering or CTO, both of whom the document makes decision-makers. "Final Release Sign-off" lists two R's and no A, contradicting the note directly beneath it.</td></tr>
+        <tr><td class="repo">E4</td><td class="note"><b>Track 2 has no schedule or capacity plan</b></td><td class="note">No duration, no minimum test scope per release, no re-test SLA, no defined behaviour if the pentest cannot finish before Feature Freeze, and a single pentester as a single point of failure.</td></tr>
+        <tr><td class="repo">E5</td><td class="note"><b>Monthly production scans have no tracker or miss-handling</b></td><td class="note">No named Jira project, no evidence retention, no escalation if a month is skipped, and coverage of production images only, not the running cluster configuration.</td></tr>
+        <tr><td class="repo">E6</td><td class="note"><b>No KEV or EPSS input</b></td><td class="note">Prioritisation keys on attack vector plus exploit-type keywords parsed from the finding title. A CVE on the CISA KEV list gets no special handling, while any Low whose title says "RCE" triggers manual review.</td></tr>
+        <tr><td class="repo">E7</td><td class="note"><b>No approved base image policy</b></td><td class="note">P4 remediation depends on "the next scheduled base image update cycle", but no inventory, owner or cadence is defined. Repos like <code>bs4</code>, <code>busybox</code>, <code>kafka</code> and <code>load-balancer</code>, all unscanned, look like exactly that inventory.</td></tr>
+        <tr><td class="repo">E8</td><td class="note"><b>No risk acceptance register</b></td><td class="note">Exceptions live per Jira epic with no consolidated view, so nobody can answer "what risk are we currently carrying" without walking every epic.</td></tr>
+        <tr><td class="repo">E9</td><td class="note"><b>The document has no owner, version, or review cadence</b></td><td class="note">No effective date and no approver, which is itself an ISO 27001 documented-information gap. The Overview also references a diagram that is not present in the file.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ================= REMEDIATION ================= -->
+<section class="sec" id="fix">
+  <div class="sec-head">
+    <div class="sec-key">&rarr;</div>
+    <h2>Remediation, in dependency order</h2>
+    <div class="sec-count">4 waves</div>
+  </div>
+  <p class="sec-intro">These are sequenced, not merely ranked. Each wave depends on the one before it holding.</p>
+
+  <div class="rem">
+    <div class="rem-band p0">
+      <div class="rem-tag">P0<small>Days</small></div>
+      <div>
+        <ol class="steps">
+          <li>Take a baseline snapshot of current Critical and High findings per component, and agree an explicit, time-boxed grandfathering list.</li>
+          <li>Enable enforcement with all three settings together: <code>only_allow_merge_if_pipeline_succeeds = true</code>, <code>allow_merge_on_skipped_pipeline = false</code>, and protected-branch push set to "No one". Any one alone leaves a way around.</li>
+          <li>Remove the <code>|| echo "...Continuing"</code> from the CRITICAL check in <code>ci-templates/trivy-merge.yaml</code>.</li>
+          <li>Set <code>grype --fail-on high</code>, or drop Grype and standardise on Trivy, so the two scanners agree on what blocks.</li>
+        </ol>
+        <div class="warnbox"><b>Sequencing matters.</b> Step 2 without step 1 stops delivery immediately: 59 of the 71 recent merges inspected would have been blocked. The baseline and the waiver list are what make the gate switchable-on.</div>
+      </div>
+    </div>
+
+    <div class="rem-band">
+      <div class="rem-tag">P1<small>Coverage</small></div>
+      <div>
+        <ol class="steps" start="5">
+          <li>Onboard the 17 actively developed repos in B1, starting with <code>case-management</code>, <code>transflux</code>, <code>amq-auth-plugin</code>, <code>tenant-config-service</code> and <code>list-management</code>.</li>
+          <li>Add a scan job to the tag and publish pipeline so the shipped image is scanned, plus a post-merge scan on <code>master</code> and <code>develop</code>.</li>
+          <li>Add Trivy config and IaC scanning to <code>cim-solution</code> and the <code>*-cd</code> and helm repos.</li>
+          <li>Fix the branch-scan <code>only:</code> refs to include <code>master</code> and <code>develop</code>, then decide once whether branch scans block or inform and make the template and all 53 repos agree.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="rem-band">
+      <div class="rem-tag">P2<small>Evidence</small></div>
+      <div>
+        <ol class="steps" start="9">
+          <li>Set <code>expire_in</code> on scan artifacts to the audit retention period, typically 12 months for SOC 2, or push results to durable external storage.</li>
+          <li>Build the consolidated release report as an automated job that collects each component's <code>gl-container-scanning-report.json</code> and deduplicates by CVE ID, rather than assigning it to a person.</li>
+          <li>Pin <code>ci-templates</code> includes to a tag instead of <code>main</code>, and protect the templates repo.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="rem-band">
+      <div class="rem-tag">P3<small>Document</small></div>
+      <div>
+        <ol class="steps" start="12">
+          <li>Reconcile E1 through E9 in a revision: differentiate the P1 and P2 deadlines, pick one escalation authority and one day count, complete the RACI, add owner, version and review cadence, and add the missing diagram.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VERIFY ================= -->
+<section class="sec" id="verify">
+  <div class="sec-head">
+    <div class="sec-key">&check;</div>
+    <h2>How to verify each wave landed</h2>
+    <div class="sec-count">4 checks</div>
+  </div>
+  <div class="verify">
+    <div class="vrow">
+      <h4>Merge gate</h4>
+      <code>glab api --hostname gitlab.expertflow.com projects/&lt;id&gt; | jq .only_allow_merge_if_pipeline_succeeds</code>
+      <p>Returns <code>true</code> for all 53 repos.</p>
+    </div>
+    <div class="vrow">
+      <h4>Regression check</h4>
+      <p>Open a throwaway MR against a repo with a known High finding and confirm the Merge button is actually disabled, not merely showing a red icon.</p>
+    </div>
+    <div class="vrow">
+      <h4>Coverage sweep</h4>
+      <code>groups/50/projects?include_subgroups=true &rarr; fetch .gitlab-ci.yml per default branch &rarr; grep trivy</code>
+      <p>The unscanned list is empty or every entry on it is explicitly waived.</p>
+    </div>
+    <div class="vrow">
+      <h4>Evidence</h4>
+      <p>Confirm <code>artifacts_expire_at</code> on a completed scan job is at least 12 months out and that <code>gl-container-scanning-report.json</code> is still downloadable from a job run last month.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Method: enumerated all 109 non-archived projects under group 50 via the GitLab REST API, fetched <code>.gitlab-ci.yml</code> from each default branch, read the shared job templates in <code>cim/ci-templates</code>, read project merge-gate and approval settings, then sampled 267 MRs merged since 2026-06-01 and inspected 71 of them at job level including raw job traces.<br>
+  Internal document. Not for external distribution.
+</footer>
+
+</div>
